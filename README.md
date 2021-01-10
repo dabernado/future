@@ -17,22 +17,22 @@
 - Actor-style concurrency
 
 ## Papers
-[Flow-Directed Lightweight Closure Conversion](./papers/fdlcc.pdf)
+- [Flow-Directed Lightweight Closure Conversion](./papers/fdlcc.pdf)
   - Describes efficient closure conversion using interprocedural analysis
-[Houyhnhnm Computing Chapter 5: Non-Stop Change](https://ngnghm.github.io/blog/2015/09/08/chapter-5-non-stop-change/)
+- [Houyhnhnm Computing Chapter 5: Non-Stop Change](https://ngnghm.github.io/blog/2015/09/08/chapter-5-non-stop-change/)
   - Describes design goals in regards to language-level support for data and code upgrading
-[Pushdown Control-Flow Analysis for Free](./papers/1507.03137.pdf)
+- [Pushdown Control-Flow Analysis for Free](./papers/1507.03137.pdf)
   - Easy to implement, inexpensive control-flow analysis
-[Compiling Tree Transforms to Operate on Packed Representations](./papers/LIPIcs-ECOOP-2017-26.pdf)
+- [Compiling Tree Transforms to Operate on Packed Representations](./papers/LIPIcs-ECOOP-2017-26.pdf)
   - Describes how to compile code that operates on trees to operate on packed representations of trees
-[ASAP: As Static As Possible memory management](./papers/UCAM-CL-TR-908.pdf)
+- [ASAP: As Static As Possible memory management](./papers/UCAM-CL-TR-908.pdf)
   - ASAP memory management strategy; needs to be extended to support higher-order functions
     - Could be alleviated with defunctionalization
-[Gradual Typing for Functional Languages](./papers/13-siek.pdf)
+- [Gradual Typing for Functional Languages](./papers/13-siek.pdf)
   - Gradual type system for lambda calculus
-[Automatic SIMD Vectorization for Haskell](./papers/vectorization-haskell.pdf)
+- [Automatic SIMD Vectorization for Haskell](./papers/vectorization-haskell.pdf)
   - Automatic SIMD vectorization of immutable arrays
-[A modern look at GRIN, an optimizing functional language back end](./papers/main.pdf)
+- [A modern look at GRIN, an optimizing functional language back end](./papers/main.pdf)
   - Summary of GRIN IR and its current implementations
 
 ## Resources
