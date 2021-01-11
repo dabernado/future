@@ -85,6 +85,9 @@ primitives = [ ("+", numBinop (+))
              , ("symbol?", isSymbol)
              , ("symbol->string", symToString)
              , ("string->symbol", strToSymbol)
+             , ("string", makeString)
+             , ("string-length", strLength)
+             , ("string-ref", indexString)
              ]
   where
     numBinop = binop numBinopTypeCheck
@@ -138,6 +141,30 @@ strToSymbol [] = throwError $ NumArgs 1 []
 strToSymbol [String s] = return $ Atom s
 strToSymbol [t] = throwError $ TypeError (String "") t
 strToSymbol n = throwError $ NumArgs 1 n
+
+makeString :: [FutureVal] -> Result FutureVal
+makeString cs = case charTypeCheck cs of
+                  err@(Left _) -> err
+                  Right _ -> return $ String (map unpackChar cs)
+  where
+    unpackChar (Char c) = c
+    charTypeCheck :: [FutureVal] -> Result FutureVal
+    charTypeCheck (Char _ : cs) = charTypeCheck cs
+    charTypeCheck [] = return $ Bool True
+    charTypeCheck (x:xs) = throwError $ TypeError (Char ' ') x
+
+strLength :: [FutureVal] -> Result FutureVal
+strLength [] = throwError $ NumArgs 1 []
+strLength [String s] = return $ Integer (length s)
+strLength [t] = throwError $ TypeError (String "") t
+strLength n = throwError $ NumArgs 1 n
+
+indexString :: [FutureVal] -> Result FutureVal
+indexString [] = throwError $ NumArgs 1 []
+indexString [Integer n, String s] = return $ Char (s !! n)
+indexString [a@(Integer _), b] = throwError $ TypeError a b
+indexString [a, _] = throwError $ TypeError (Integer 0) a
+indexString n = throwError $ NumArgs 1 n
 
 binop :: (FutureVal -> FutureVal -> Result FutureVal) -> (FutureVal -> FutureVal -> FutureVal) -> [FutureVal] -> Result FutureVal
 binop typeCheck op [] = throwError $ NumArgs 2 []
