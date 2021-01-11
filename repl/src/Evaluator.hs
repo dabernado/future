@@ -18,6 +18,28 @@ eval (List [Atom "if", pred, conseq, alt]) = do
     Bool False -> eval alt
     Bool True -> eval conseq
     _ -> throwError $ TypeError (Bool True) result
+eval form@(List (Atom "cond" : clauses)) =
+  if null clauses
+  then throwError $ BadSpecialForm "no clause in cond expression: " form
+  else case head clauses of
+         List [Atom "else", val] -> eval val
+         List [test, expr] -> eval $ List [Atom "if"
+                                       , test
+                                       , expr
+                                       , List (Atom "cond" : tail clauses)]
+         _ -> throwError $ BadSpecialForm "ill-formed cond expression: " form
+eval form@(List (Atom "case" : key : clauses)) =
+  if null clauses
+  then throwError $ BadSpecialForm "no clause in case expression: " form
+  else case head clauses of
+         List (Atom "else" : exprs) -> mapM eval exprs >>= return . last
+         List (List datums : exprs) -> do
+           result <- eval key
+           equality <- mapM (\x -> eval (List [Atom "=", x, result])) datums
+           if Bool True `elem` equality
+              then mapM eval exprs >>= return . last
+              else eval $ List (Atom "case" : key : tail clauses)
+         _ -> throwError $ BadSpecialForm "ill-formed case expression: " form
 eval (List [Atom "quote", val]) = return val
 eval (List [Atom "quasiquote", List val]) = mapM evalQQ val >>= (return . List)
 eval (List [Atom "quasiquote", val]) = return val
