@@ -16,7 +16,8 @@ eval (List [Atom "if", pred, conseq, alt]) = do
   result <- eval pred
   case result of
     Bool False -> eval alt
-    _ -> eval conseq
+    Bool True -> eval conseq
+    _ -> throwError $ TypeError (Bool True) result
 eval (List [Atom "quote", val]) = return val
 eval (List [Atom "quasiquote", List val]) = mapM evalQQ val >>= (return . List)
 eval (List [Atom "quasiquote", val]) = return val
@@ -56,6 +57,9 @@ primitives = [ ("+", numBinop (+))
              , ("&&", boolBinop andF)
              , ("||", boolBinop orF)
              , ("++", strBinop concatF)
+             , ("car", car)
+             , ("cdr", cdr)
+             , ("cons", cons)
              , ("symbol?", isSymbol)
              , ("symbol->string", symToString)
              , ("string->symbol", strToSymbol)
@@ -74,6 +78,26 @@ primitives = [ ("+", numBinop (+))
     andF (Bool a) (Bool b) = Bool $ a && b
     orF (Bool a) (Bool b) = Bool $ a || b
     concatF (String a) (String b) = String $ a ++ b
+
+car :: [FutureVal] -> Result FutureVal
+car [List (x:xs)] = return x
+car [DottedList (x:xs) _] = return x
+car [arg] = throwError $ TypeError (List []) arg
+car args = throwError $ NumArgs 1 args
+
+cdr :: [FutureVal] -> Result FutureVal
+cdr [List (x : xs)] = return $ List xs
+cdr [DottedList [_] x] = return x
+cdr [DottedList (_ : xs) x] = return $ DottedList xs x
+cdr [arg] = throwError $ TypeError (List []) arg 
+cdr args = throwError $ NumArgs 1 args
+
+cons :: [FutureVal] -> Result FutureVal
+cons [x, List []] = return $ List [x]
+cons [x, List xs] = return $ List (x:xs)
+cons [x, DottedList xs xlast] = return $ DottedList (x:xs) xlast
+cons [x, y] = return $ DottedList [x] y
+cons args = throwError $ NumArgs 2 args
 
 isSymbol :: [FutureVal] -> Result FutureVal
 isSymbol [] = throwError $ NumArgs 1 []
