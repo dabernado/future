@@ -38,6 +38,7 @@ bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
 
 data FutureVal = Atom String
                | List [FutureVal]
+               | Function ([FutureVal] -> FutureVal)
                | DottedList [FutureVal] FutureVal
                | Vector (Vector FutureVal)
                | Integer Int
@@ -46,7 +47,7 @@ data FutureVal = Atom String
                | String String
                | Char Char
                | Bool Bool
-               deriving (Eq, Ord)
+               deriving (Eq)
 
 instance Show FutureVal where
   show v@(Atom a) = showType v ++ " " ++ a 
@@ -100,25 +101,14 @@ instance Fractional FutureVal where
   (/) (Float a) (Float b) = Float $ a / b
   (/) (Ratio a) (Ratio b) = Ratio $ a / b
 
-instance Real FutureVal where
-  toRational (Integer n) = toRational n
-  toRational (Float f) = toRational f
-  toRational (Ratio r) = r
-
 instance Enum FutureVal where
   toEnum n = Integer n
   fromEnum (Integer n) = n
   fromEnum (Float f) = fromEnum f
   fromEnum (Ratio r) = fromEnum r
 
-instance Integral FutureVal where
-  quotRem (Integer a) (Integer b) = ((Integer $ quot a b), (Integer $ rem a b))
-  toInteger (Integer n) = toInteger n
-
 unwordsList :: [FutureVal] -> String
 unwordsList = unwords . map show
-
-
 
 data FutureError = NumArgs Int [FutureVal]
                  | TypeError FutureVal FutureVal
