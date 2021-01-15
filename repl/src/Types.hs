@@ -38,7 +38,7 @@ bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
 
 data FutureVal = Atom String
                | List [FutureVal]
-               | Function ([FutureVal] -> FutureVal)
+               | Function ([FutureVal] -> Result FutureVal)
                | DottedList [FutureVal] FutureVal
                | Vector (Vector FutureVal)
                | Integer Int
