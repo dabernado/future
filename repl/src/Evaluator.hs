@@ -4,58 +4,60 @@ import Types
 
 import Control.Monad.Except
 
-eval :: FutureVal -> Result FutureVal
-eval val@(Char _) = return val
-eval val@(String _) = return val
-eval val@(Bool _) = return val
-eval val@(Integer _) = return val
-eval val@(Float _) = return val
-eval val@(Ratio _) = return val
-eval (List [val]) = return val
-eval (List [Atom "if", pred, conseq, alt]) = do
-  result <- eval pred
+eval :: Env -> FutureVal -> IOResult FutureVal
+eval env val@(Char _) = return val
+eval env val@(String _) = return val
+eval env val@(Bool _) = return val
+eval env val@(Integer _) = return val
+eval env val@(Float _) = return val
+eval env val@(Ratio _) = return val
+eval env (Atom id) = getVar env id
+eval env (List [val]) = return val
+eval env (List [Atom "quote", val]) = return val
+eval env (List [Atom "quasiquote", List val]) = mapM (evalQQ env) val >>= (return . List)
+eval env (List [Atom "quasiquote", val]) = return val
+eval env (List [Atom "if", pred, conseq, alt]) = do
+  result <- eval env pred
   case result of
-    Bool False -> eval alt
-    Bool True -> eval conseq
+    Bool False -> eval env alt
+    Bool True -> eval env conseq
     _ -> throwError $ TypeError (Bool True) result
-eval form@(List (Atom "cond" : clauses)) =
+eval env form@(List (Atom "cond" : clauses)) =
   if null clauses
   then throwError $ BadSpecialForm "no clause in cond expression: " form
   else case head clauses of
-         List [Atom "else", val] -> eval val
-         List [test, expr] -> eval $ List [Atom "if"
+         List [Atom "else", val] -> eval env val
+         List [test, expr] -> eval env $ List [Atom "if"
                                        , test
                                        , expr
                                        , List (Atom "cond" : tail clauses)]
          _ -> throwError $ BadSpecialForm "ill-formed cond expression: " form
-eval form@(List (Atom "case" : key : clauses)) =
+eval env form@(List (Atom "case" : key : clauses)) =
   if null clauses
   then throwError $ BadSpecialForm "no clause in case expression: " form
   else case head clauses of
-         List (Atom "else" : exprs) -> mapM eval exprs >>= return . last
+         List (Atom "else" : exprs) -> mapM (eval env) exprs >>= return . last
          List (List datums : exprs) -> do
-           result <- eval key
-           equality <- mapM (\x -> eval (List [Atom "=", x, result])) datums
+           result <- eval env key
+           equality <- mapM (\x -> eval env (List [Atom "=", x, result])) datums
            if Bool True `elem` equality
-              then mapM eval exprs >>= return . last
-              else eval $ List (Atom "case" : key : tail clauses)
+              then mapM (eval env) exprs >>= return . last
+              else eval env $ List (Atom "case" : key : tail clauses)
          _ -> throwError $ BadSpecialForm "ill-formed case expression: " form
-eval (List [Atom "quote", val]) = return val
-eval (List [Atom "quasiquote", List val]) = mapM evalQQ val >>= (return . List)
-eval (List [Atom "quasiquote", val]) = return val
-eval (List (Atom func : args)) = mapM eval args >>= apply func
-eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
+eval env (List [Atom "def", Atom var, form]) = eval env form >>= defineVar env var
+eval env (List (Atom func : args)) = mapM (eval env) args >>= liftResult . apply func
+eval env badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
-evalQQ :: FutureVal -> Result FutureVal
-evalQQ val@(Char _) = return val
-evalQQ val@(String _) = return val
-evalQQ val@(Bool _) = return val
-evalQQ val@(Integer _) = return val
-evalQQ val@(Float _) = return val
-evalQQ val@(Ratio _) = return val
-evalQQ (List [Atom "unquote", val]) = eval val
+evalQQ :: Env -> FutureVal -> IOResult FutureVal
+evalQQ env val@(Char _) = return val
+evalQQ env val@(String _) = return val
+evalQQ env val@(Bool _) = return val
+evalQQ env val@(Integer _) = return val
+evalQQ env val@(Float _) = return val
+evalQQ env val@(Ratio _) = return val
+evalQQ env (List [Atom "unquote", val]) = eval env val
 --evalQQ (List [Atom "unquote-splicing", List val]) = eval val
-evalQQ val@(List _) = return val
+evalQQ env val@(List _) = return val
 
 apply :: String -> [FutureVal] -> Result FutureVal
 apply func args = maybe

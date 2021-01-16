@@ -1,10 +1,40 @@
 module Types where
 
+import Data.IORef
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import Data.Ratio (numerator, denominator, (%))
 import Control.Monad.Except
 import Text.ParserCombinators.Parsec
+
+type Env = IORef [(String, FutureVal)]
+
+nullEnv :: IO Env
+nullEnv = newIORef []
+
+isBound :: Env -> String -> IO Bool
+isBound env var = readIORef env >>= return . maybe False (const True) . lookup var
+
+getVar :: Env -> String -> IOResult FutureVal
+getVar envRef var = do
+  env <- liftIO $ readIORef envRef
+  maybe (throwError $ UnboundVar "Getting an unbound variable" var)
+        (return)
+        (lookup var env)
+
+defineVar :: Env -> String -> FutureVal -> IOResult FutureVal
+defineVar envRef var val = do
+  alreadyDefined <- liftIO $ isBound envRef var
+  if alreadyDefined
+     then throwError $ Immutable "Variable is already defined" var
+     else liftIO $ do
+          env <- readIORef envRef
+          writeIORef envRef ((var, val) : env)
+          return val
+
+bindVars :: Env -> [(String, FutureVal)] -> IO Env
+bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
+    where extendEnv bindings env = liftM (++ env) (return bindings)
 
 data FutureVal = Atom String
                | List [FutureVal]
@@ -96,12 +126,22 @@ data FutureError = NumArgs Int [FutureVal]
                  | BadSpecialForm String FutureVal
                  | NotFunction String String
                  | UnboundVar String String
+                 | Immutable String String
                  | Default String
 
 type Result = Either FutureError
+type IOResult = ExceptT FutureError IO
+
+liftResult :: Result a -> IOResult a
+liftResult (Left err) = throwError err
+liftResult (Right val) = return val
+
+runIOResult :: IOResult String -> IO String
+runIOResult action = runExceptT (trapError action) >>= return . extractValue
 
 instance Show FutureError where
   show (UnboundVar msg var) = msg ++ " - " ++ var
+  show (Immutable msg var) = msg ++ " - " ++ var
   show (BadSpecialForm msg form) = msg ++ " - " ++ show form
   show (NotFunction msg func) = msg ++ " - " ++ func
   show (NumArgs exp found) = "Expected " ++ show exp ++
