@@ -47,7 +47,30 @@ data FutureVal = Atom String
                | String String
                | Char Char
                | Bool Bool
-               deriving (Eq)
+
+instance Eq FutureVal where
+  (==) (Atom a) (Atom b) = a == b
+  (==) (String a) (String b) = a == b
+  (==) (Char a) (Char b) = a == b
+  (==) (Bool a) (Bool b) = a == b
+  (==) (Integer a) (Integer b) = a == b
+  (==) (Float a) (Float b) = a == b
+  (==) (Ratio a) (Ratio b) = a == b
+  (==) (List a) (List b) = a == b
+  (==) (DottedList as a) (DottedList bs b) = (a == b) && (as == bs)
+  (==) (Vector a) (Vector b) = a == b
+
+instance Ord FutureVal where
+  (<=) (Atom a) (Atom b) = a <= b
+  (<=) (String a) (String b) = a <= b
+  (<=) (Char a) (Char b) = a <= b
+  (<=) (Bool a) (Bool b) = a <= b
+  (<=) (Integer a) (Integer b) = a <= b
+  (<=) (Float a) (Float b) = a <= b
+  (<=) (Ratio a) (Ratio b) = a <= b
+  (<=) (List a) (List b) = a <= b
+  (<=) (DottedList as a) (DottedList bs b) = (a <= b) && (as <= bs)
+  (<=) (Vector a) (Vector b) = a <= b
 
 instance Show FutureVal where
   show v@(Atom a) = showType v ++ " " ++ a 
@@ -106,6 +129,13 @@ instance Enum FutureVal where
   fromEnum (Integer n) = n
   fromEnum (Float f) = fromEnum f
   fromEnum (Ratio r) = fromEnum r
+
+instance Real FutureVal where
+  toRational (Integer x) = toRational x
+
+instance Integral FutureVal where
+  quotRem (Integer a) (Integer b) = (Integer $ quot a b, Integer $ rem a b)
+  toInteger (Integer x) = toInteger x
 
 unwordsList :: [FutureVal] -> String
 unwordsList = unwords . map show
