@@ -45,8 +45,25 @@ eval env form@(List (Atom "case" : key : clauses)) =
               else eval env $ List (Atom "case" : key : tail clauses)
          _ -> throwError $ BadSpecialForm "ill-formed case expression: " form
 eval env (List [Atom "def", Atom var, form]) = eval env form >>= defineVar env var
-eval env (List (Atom func : args)) = mapM (eval env) args >>= liftResult . apply func
+eval env (List (Atom "defn" : List (Atom var : params) : body)) =
+  makeNormalFunc env params body >>= defineVar env var
+eval env (List (Atom "defn" : DottedList (Atom var : params) varargs : body)) =
+  makeVarArgs varargs env params body >>= defineVar env var
+eval env (List (Atom "fn" : List params : body)) =
+  makeNormalFunc env params body
+eval env (List (Atom "fn" : DottedList params varargs : body)) =
+  makeVarArgs varargs env params body
+eval env (List (Atom "fn" : varargs@(Atom _) : body)) =
+  makeVarArgs varargs env [] body
+eval env (List (func : args)) = do
+  f <- eval env func
+  argVals <- mapM (eval env) args
+  apply f argVals
 eval env badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
+
+makeFunc varargs env params body = return $ Function (map showVal params) varargs body env
+makeNormalFunc = makeFunc Nothing
+makeVarArgs = makeFunc . Just . showVal
 
 evalQQ :: Env -> FutureVal -> IOResult FutureVal
 evalQQ env val@(Char _) = return val
@@ -59,10 +76,17 @@ evalQQ env (List [Atom "unquote", val]) = eval env val
 --evalQQ (List [Atom "unquote-splicing", List val]) = eval val
 evalQQ env val@(List _) = return val
 
-apply :: String -> [FutureVal] -> Result FutureVal
-apply func args = maybe
-  (throwError $ NotFunction "Unrecognized primitive function args" func)
-  ($ args) (lookup func primitives)
+apply :: FutureVal -> [FutureVal] -> IOResult FutureVal
+apply (Primitive func) args = liftResult $ func args
+apply (Function params varargs body env) args =
+      if length params /= length args && varargs == Nothing
+         then throwError $ NumArgs (length params) args
+         else (liftIO $ bindVars env $ zip params args) >>= bindVarArgs varargs >>= evalBody
+      where remainingArgs = drop (length params) args
+            evalBody env = liftM last $ mapM (eval env) body
+            bindVarArgs arg env = case arg of
+                Just argName -> liftIO $ bindVars env [(argName, List $ remainingArgs)]
+                Nothing -> return env
 
 primitives :: [(String, [FutureVal] -> Result FutureVal)]
 primitives = [ ("+", numBinop (+))
