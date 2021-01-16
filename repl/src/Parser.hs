@@ -10,7 +10,7 @@ import Text.ParserCombinators.Parsec hiding (spaces)
 import System.Environment
 
 symbol :: Parser Char
-symbol = oneOf "*+!/:-_?=<>&|"
+symbol = oneOf "*+!/:-_?=<>|"
 
 spaces :: Parser ()
 spaces = skipMany (char ',') >> skipMany1 space
@@ -21,7 +21,7 @@ parseList = liftM List $ sepBy parseExpr spaces
 parseDottedList :: Parser FutureVal
 parseDottedList = do
     head <- endBy parseExpr spaces
-    tail <- char '.' >> spaces >> parseExpr
+    tail <- char '&' >> spaces >> parseExpr
     return $ DottedList head tail
 
 parseAnyList :: Parser FutureVal
