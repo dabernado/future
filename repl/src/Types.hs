@@ -38,7 +38,6 @@ bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
 
 data FutureVal = Atom String
                | List [FutureVal]
-               | Function ([FutureVal] -> Result FutureVal)
                | DottedList [FutureVal] FutureVal
                | Vector (Vector FutureVal)
                | Integer Int
@@ -47,6 +46,12 @@ data FutureVal = Atom String
                | String String
                | Char Char
                | Bool Bool
+               | Primitive ([FutureVal] -> Result FutureVal)
+               | Function { params :: [String]
+                          , vararg :: Maybe String
+                          , body :: [FutureVal]
+                          , closure :: Env
+                          }
 
 instance Eq FutureVal where
   (==) (Atom a) (Atom b) = a == b

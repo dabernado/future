@@ -177,6 +177,8 @@ binop typeCheck op params@(x:xs) = case foldM typeCheck x xs of
                            Right _ -> (return . foldl1 op) params
 
 genBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
+genBinopTypeCheck a@(Primitive _) _ = throwError $ TypeError (Integer 0) a
+genBinopTypeCheck a@(Function _ _ _ _) _ = throwError $ TypeError (Integer 0) a
 genBinopTypeCheck a b = if (showType a) == (showType b)
                         then return b
                         else throwError $ TypeError a b
