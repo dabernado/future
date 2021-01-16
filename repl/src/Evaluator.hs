@@ -69,9 +69,9 @@ primitives = [ ("+", numBinop (+))
              , ("-", numBinop (-))
              , ("*", numBinop (*))
              , ("/", numBinop (/))
-             , ("mod", numBinop mod)
-             , ("quot", numBinop quot)
-             , ("rem", numBinop rem)
+             , ("mod", intBinop mod)
+             , ("quot", intBinop quot)
+             , ("rem", intBinop rem)
              , ("=", genBinop eq)
              , ("/=", genBinop notEq)
              , ("<", genBinop lt)
@@ -93,6 +93,7 @@ primitives = [ ("+", numBinop (+))
              ]
   where
     numBinop = binop numBinopTypeCheck
+    intBinop = binop intBinopTypeCheck
     genBinop = binop genBinopTypeCheck
     boolBinop = binop boolBinopTypeCheck
     strBinop = binop strBinopTypeCheck
@@ -188,6 +189,11 @@ numBinopTypeCheck a@(Integer _) b@_ = throwError $ TypeError a b
 numBinopTypeCheck a@(Float _) b@_ = throwError $ TypeError a b
 numBinopTypeCheck a@(Ratio _) b@_ = throwError $ TypeError a b
 numBinopTypeCheck a@_ _ = throwError $ TypeError (Integer 0) a
+
+intBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
+intBinopTypeCheck (Integer _) succ@(Integer _) = return succ
+intBinopTypeCheck a@(Integer _) b@_ = throwError $ TypeError a b
+intBinopTypeCheck a@_ _ = throwError $ TypeError (Integer 0) a
 
 boolBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
 boolBinopTypeCheck (Bool _) succ@(Bool _) = return succ
