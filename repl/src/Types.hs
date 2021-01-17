@@ -89,18 +89,18 @@ instance Show FutureVal where
                      show (numerator r) ++ "/" ++ show (denominator r)
   show v@(List xs) = showType v ++ " " ++ "(" ++ unwordsList xs ++ ")"
   show v@(DottedList x xs) = showType v ++ " " ++
-                             "(" ++ unwordsList x ++ " & " ++ show xs ++ ")"
+                             "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
   show val@(Vector v) = showType val ++ " " ++
                         "(" ++ (unwordsList . Vector.toList) v ++ ")"
   show v@(Primitive _) = showType v ++ " <primitive>"
   show v@(Function { params = args
                    , vararg = varargs
-                   , body = _
+                   , body = body
                    , closure = env
                    }) = showType v ++ " (fn (" ++ unwords (map show args) ++
                         (case varargs of
                            Nothing -> ""
-                           Just arg -> " & " ++ arg) ++ ") ...)"
+                           Just arg -> " . " ++ arg) ++ ") ...)"
 
 showVal :: FutureVal -> String
 showVal v@(Atom a) = a 
@@ -112,7 +112,7 @@ showVal v@(Integer n) = show n
 showVal v@(Float f) = show f
 showVal v@(Ratio r) = show (numerator r) ++ "/" ++ show (denominator r)
 showVal v@(List xs) = "(" ++ unwordsList xs ++ ")"
-showVal v@(DottedList x xs) = "(" ++ unwordsList x ++ " & " ++ show xs ++ ")"
+showVal v@(DottedList x xs) = "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
 showVal val@(Vector v) = "(" ++ (unwordsList . Vector.toList) v ++ ")"
 showVal v@(Primitive _) = "<primitive>"
 showVal v@(Function { params = args
@@ -122,7 +122,7 @@ showVal v@(Function { params = args
                    }) = " (fn (" ++ unwords (map show args) ++
                         (case varargs of
                            Nothing -> ""
-                           Just arg -> " & " ++ arg) ++ ") ...)"
+                           Just arg -> " . " ++ arg) ++ ") ...)"
 
 showType :: FutureVal -> String
 showType (Atom _) = ":Atom"

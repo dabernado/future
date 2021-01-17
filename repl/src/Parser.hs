@@ -2,6 +2,7 @@ module Parser where
 
 import Types
 
+import Data.List (nub)
 import Data.Ratio ((%))
 import qualified Data.Vector as Vector
 import Control.Monad
@@ -10,7 +11,7 @@ import Text.ParserCombinators.Parsec hiding (spaces)
 import System.Environment
 
 symbol :: Parser Char
-symbol = oneOf "*+!/:-_?=<>|"
+symbol = oneOf "*+!/:-_?=&<>|"
 
 spaces :: Parser ()
 spaces = skipMany (char ',') >> skipMany1 space
@@ -21,7 +22,7 @@ parseList = liftM List $ sepBy parseExpr spaces
 parseDottedList :: Parser FutureVal
 parseDottedList = do
     head <- endBy parseExpr spaces
-    tail <- char '&' >> spaces >> parseExpr
+    tail <- char '.' >> spaces >> parseExpr
     return $ DottedList head tail
 
 parseAnyList :: Parser FutureVal
@@ -38,14 +39,6 @@ parseVector = do
     char ']'
     return $ Vector $ Vector.fromList xs
 
-parseSet :: Parser FutureVal
-parseSet = do
-    char '#'
-    char '{'
-    xs <- sepBy parseExpr spaces
-    char '}'
-    return $ List [Atom ":Set", List xs]
-
 parseMap :: Parser FutureVal
 parseMap = do
     char '{'
@@ -58,6 +51,47 @@ parseMap = do
         spaces
         value <- parseExpr
         return $ [key, value]
+
+parsePound :: Parser FutureVal
+parsePound = do
+    char '#'
+    x <- try parseSet <|> parseAnonFunc
+    return x
+
+parseSet :: Parser FutureVal
+parseSet = do
+    char '{'
+    xs <- sepBy parseExpr spaces
+    char '}'
+    return $ List [Atom ":Set", List xs]
+
+parseAnonFunc :: Parser FutureVal
+parseAnonFunc = do
+    char '('
+    xs <- sepBy (parseExpr <|> parseAnonArg) spaces
+    char ')'
+    let args = sortArgs $ nub (filter isAnonArg xs)
+    return $ if last args == (Atom "%&")
+                then List (Atom "fn" : DottedList (init args) (last args) : [List xs])
+                else List (Atom "fn" : List args : [List xs])
+  where
+    parseAnonArg = do
+      char '%'
+      num <- many1 digit <|> (char '&' >>= singleton)
+      return $ Atom ('%':num)
+    singleton x = return [x]
+    sortArgs [] = []
+    sortArgs (x:xs) = sortArgs [y | y <- xs, ordArgs y x]
+                      ++ [x]
+                      ++ sortArgs [y | y <- xs, not (ordArgs y x)]
+    ordArgs (Atom ('%':a)) (Atom ('%':b)) =
+        if a == "&"
+        then False
+        else if b == "&" then True else a < b
+    isAnonArg (Atom ('%':_)) = True
+    isAnonArg _ = False
+    isVarArg (Atom "%&") = True
+    isVarArg _ = False
 
 parseQuoted :: Parser FutureVal
 parseQuoted = do
@@ -104,6 +138,7 @@ parseQuasiQuoted = do
                <|> parseSet
                <|> parseMap
                <|> parseAnyQQList
+               <|> parsePound
 
 parseChar :: Parser FutureVal
 parseChar = do
@@ -152,6 +187,7 @@ parseExpr = parseAtom
         <|> parseSet
         <|> parseMap
         <|> parseAnyList
+        <|> parsePound
 
 readExpr :: String -> Result FutureVal
 readExpr input = case parse parseExpr "future" input of
