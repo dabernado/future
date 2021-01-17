@@ -45,9 +45,9 @@ eval env form@(List (Atom "case" : key : clauses)) =
               else eval env $ List (Atom "case" : key : tail clauses)
          _ -> throwError $ BadSpecialForm "ill-formed case expression: " form
 eval env (List [Atom "def", Atom var, form]) = eval env form >>= defineVar env var
-eval env (List (Atom "defn" : List (Atom var : params) : body)) =
+eval env (List (Atom "defn" : Atom var : List params : body)) =
   makeNormalFunc env params body >>= defineVar env var
-eval env (List (Atom "defn" : DottedList (Atom var : params) varargs : body)) =
+eval env (List (Atom "defn" : Atom var : DottedList params varargs : body)) =
   makeVarArgs varargs env params body >>= defineVar env var
 eval env (List (Atom "fn" : List params : body)) =
   makeNormalFunc env params body
