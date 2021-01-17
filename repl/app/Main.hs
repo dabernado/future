@@ -1,8 +1,17 @@
 module Main where
 
 import Parser (readExpr)
-import Evaluator (eval)
-import Types (Env, trapError, extractValue, liftResult, nullEnv, runIOResult)
+import Evaluator (eval, primitives)
+import Types (
+    Env
+  , FutureVal(..)
+  , bindVars
+  , trapError
+  , extractValue
+  , liftResult
+  , nullEnv
+  , runIOResult
+  )
 
 import Control.Monad
 import System.Environment
@@ -27,11 +36,15 @@ until_ pred prompt action = do
       then return ()
       else action result >> until_ pred prompt action
 
+primitiveBindings :: IO Env
+primitiveBindings = nullEnv >>= (flip bindVars $ map makePrimitive primitives)
+    where makePrimitive (var, func) = (var, Primitive func)
+
 runOne :: String -> IO ()
-runOne expr = nullEnv >>= flip evalAndPrint expr
+runOne expr = primitiveBindings >>= flip evalAndPrint expr
 
 runRepl :: IO ()
-runRepl = nullEnv >>= until_ (== "quit") (readPrompt "Future>>> ") . evalAndPrint
+runRepl = primitiveBindings >>= until_ (== "quit") (readPrompt "Future>>> ") . evalAndPrint
 
 main :: IO ()
 main = do
