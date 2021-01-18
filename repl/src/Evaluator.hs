@@ -61,9 +61,12 @@ eval env (List (func : args)) = do
   apply f argVals
 eval env badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
-makeFunc varargs env params body = return $ Function (map showVal params) varargs body env
+makeFunc varargs env params body =
+  return $ Function (map (expandParam env) params) varargs body env
 makeNormalFunc = makeFunc Nothing
-makeVarArgs = makeFunc . Just . showVal
+makeVarArgs = makeFunc . Just . expandParam
+
+handleParams :: [FutureVal] -> [(String, FutureType)]
 
 evalQQ :: Env -> FutureVal -> IOResult FutureVal
 evalQQ env val@(Char _) = return val
