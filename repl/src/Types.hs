@@ -1,10 +1,40 @@
 module Types where
 
+import Data.IORef
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import Data.Ratio (numerator, denominator, (%))
 import Control.Monad.Except
 import Text.ParserCombinators.Parsec
+
+type Env = IORef [(String, FutureVal)]
+
+nullEnv :: IO Env
+nullEnv = newIORef []
+
+isBound :: Env -> String -> IO Bool
+isBound env var = readIORef env >>= return . maybe False (const True) . lookup var
+
+getVar :: Env -> String -> IOResult FutureVal
+getVar envRef var = do
+  env <- liftIO $ readIORef envRef
+  maybe (throwError $ UnboundVar "Getting an unbound variable" var)
+        (return)
+        (lookup var env)
+
+defineVar :: Env -> String -> FutureVal -> IOResult FutureVal
+defineVar envRef var val = do
+  alreadyDefined <- liftIO $ isBound envRef var
+  if alreadyDefined
+     then throwError $ Immutable "Variable is already defined" var
+     else liftIO $ do
+          env <- readIORef envRef
+          writeIORef envRef ((var, val) : env)
+          return val
+
+bindVars :: Env -> [(String, FutureVal)] -> IO Env
+bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
+    where extendEnv bindings env = liftM (++ env) (return bindings)
 
 data FutureVal = Atom String
                | List [FutureVal]
@@ -16,7 +46,36 @@ data FutureVal = Atom String
                | String String
                | Char Char
                | Bool Bool
-               deriving (Eq, Ord)
+               | Primitive ([FutureVal] -> Result FutureVal)
+               | Function { params :: [String]
+                          , vararg :: Maybe String
+                          , body :: [FutureVal]
+                          , closure :: Env
+                          }
+
+instance Eq FutureVal where
+  (==) (Atom a) (Atom b) = a == b
+  (==) (String a) (String b) = a == b
+  (==) (Char a) (Char b) = a == b
+  (==) (Bool a) (Bool b) = a == b
+  (==) (Integer a) (Integer b) = a == b
+  (==) (Float a) (Float b) = a == b
+  (==) (Ratio a) (Ratio b) = a == b
+  (==) (List a) (List b) = a == b
+  (==) (DottedList as a) (DottedList bs b) = (a == b) && (as == bs)
+  (==) (Vector a) (Vector b) = a == b
+
+instance Ord FutureVal where
+  (<=) (Atom a) (Atom b) = a <= b
+  (<=) (String a) (String b) = a <= b
+  (<=) (Char a) (Char b) = a <= b
+  (<=) (Bool a) (Bool b) = a <= b
+  (<=) (Integer a) (Integer b) = a <= b
+  (<=) (Float a) (Float b) = a <= b
+  (<=) (Ratio a) (Ratio b) = a <= b
+  (<=) (List a) (List b) = a <= b
+  (<=) (DottedList as a) (DottedList bs b) = (a <= b) && (as <= bs)
+  (<=) (Vector a) (Vector b) = a <= b
 
 instance Show FutureVal where
   show v@(Atom a) = showType v ++ " " ++ a 
@@ -33,6 +92,37 @@ instance Show FutureVal where
                              "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
   show val@(Vector v) = showType val ++ " " ++
                         "(" ++ (unwordsList . Vector.toList) v ++ ")"
+  show v@(Primitive _) = showType v ++ " <primitive>"
+  show v@(Function { params = args
+                   , vararg = varargs
+                   , body = body
+                   , closure = env
+                   }) = showType v ++ " (fn (" ++ unwords (map show args) ++
+                        (case varargs of
+                           Nothing -> ""
+                           Just arg -> " . " ++ arg) ++ ") ...)"
+
+showVal :: FutureVal -> String
+showVal v@(Atom a) = a 
+showVal v@(String s) = "\"" ++ s ++ "\""
+showVal v@(Char c) = '\\':(c:"")
+showVal v@(Bool True) = "true"
+showVal v@(Bool False) = "false"
+showVal v@(Integer n) = show n
+showVal v@(Float f) = show f
+showVal v@(Ratio r) = show (numerator r) ++ "/" ++ show (denominator r)
+showVal v@(List xs) = "(" ++ unwordsList xs ++ ")"
+showVal v@(DottedList x xs) = "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
+showVal val@(Vector v) = "(" ++ (unwordsList . Vector.toList) v ++ ")"
+showVal v@(Primitive _) = "<primitive>"
+showVal v@(Function { params = args
+                   , vararg = varargs
+                   , body = _
+                   , closure = env
+                   }) = " (fn (" ++ unwords (map show args) ++
+                        (case varargs of
+                           Nothing -> ""
+                           Just arg -> " . " ++ arg) ++ ") ...)"
 
 showType :: FutureVal -> String
 showType (Atom _) = ":Atom"
@@ -45,6 +135,8 @@ showType (Ratio _) = ":Ratio"
 showType (List _) = ":List"
 showType (DottedList _ _) = ":DottedList"
 showType (Vector _) = ":Vector"
+showType (Primitive _) = ":Function"
+showType (Function _ _ _ _) = ":Function"
 
 instance Num FutureVal where
   (+) (Integer a) (Integer b) = Integer $ a + b
@@ -70,25 +162,21 @@ instance Fractional FutureVal where
   (/) (Float a) (Float b) = Float $ a / b
   (/) (Ratio a) (Ratio b) = Ratio $ a / b
 
-instance Real FutureVal where
-  toRational (Integer n) = toRational n
-  toRational (Float f) = toRational f
-  toRational (Ratio r) = r
-
 instance Enum FutureVal where
   toEnum n = Integer n
   fromEnum (Integer n) = n
   fromEnum (Float f) = fromEnum f
   fromEnum (Ratio r) = fromEnum r
 
+instance Real FutureVal where
+  toRational (Integer x) = toRational x
+
 instance Integral FutureVal where
-  quotRem (Integer a) (Integer b) = ((Integer $ quot a b), (Integer $ rem a b))
-  toInteger (Integer n) = toInteger n
+  quotRem (Integer a) (Integer b) = (Integer $ quot a b, Integer $ rem a b)
+  toInteger (Integer x) = toInteger x
 
 unwordsList :: [FutureVal] -> String
 unwordsList = unwords . map show
-
-
 
 data FutureError = NumArgs Int [FutureVal]
                  | TypeError FutureVal FutureVal
@@ -96,12 +184,22 @@ data FutureError = NumArgs Int [FutureVal]
                  | BadSpecialForm String FutureVal
                  | NotFunction String String
                  | UnboundVar String String
+                 | Immutable String String
                  | Default String
 
 type Result = Either FutureError
+type IOResult = ExceptT FutureError IO
+
+liftResult :: Result a -> IOResult a
+liftResult (Left err) = throwError err
+liftResult (Right val) = return val
+
+runIOResult :: IOResult String -> IO String
+runIOResult action = runExceptT (trapError action) >>= return . extractValue
 
 instance Show FutureError where
   show (UnboundVar msg var) = msg ++ " - " ++ var
+  show (Immutable msg var) = msg ++ " - " ++ var
   show (BadSpecialForm msg form) = msg ++ " - " ++ show form
   show (NotFunction msg func) = msg ++ " - " ++ func
   show (NumArgs exp found) = "Expected " ++ show exp ++

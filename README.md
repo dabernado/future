@@ -36,5 +36,6 @@
   - Summary of GRIN IR and its current implementations
 
 ## Resources
+- [Write You A Scheme in 48 Hours](https://en.wikibooks.org/wiki/Write_Yourself_a_Scheme_in_48_Hours)
 - [Writing A Lisp Interpreter In Haskell](https://www.defmacro.org/ramblings/lisp-in-haskell.html)
 - [Write You a Haskell](http://dev.stephendiehl.com/fun/index.html)
