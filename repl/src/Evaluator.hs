@@ -62,11 +62,16 @@ eval env (List (func : args)) = do
 eval env badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
 makeFunc varargs env params body =
-  return $ Function (map (expandParam env) params) varargs body env
+  return $ Function (expandParams env params) varargs body env
 makeNormalFunc = makeFunc Nothing
-makeVarArgs = makeFunc . Just . expandParam
+makeVarArgs = makeFunc . Just . showVal
 
-handleParams :: [FutureVal] -> [(String, FutureType)]
+expandParams :: Env -> [FutureVal] -> [(String, FutureType)]
+expandParams env (Atom t@(':':_) : Atom id : params) =
+  let asType (TypeConst _ t) = t
+  in (id, asType $ getVar env t) : (expandParams env params)
+expandParams env (Atom id : params) = (id, AnyT) : (expandParams env params)
+expandParams env [] = []
 
 evalQQ :: Env -> FutureVal -> IOResult FutureVal
 evalQQ env val@(Char _) = return val
