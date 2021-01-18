@@ -47,7 +47,7 @@ data FutureVal = Atom String
                | Char Char
                | Bool Bool
                | TypeConst [FutureType] FutureType
-               | Primitive ([FutureVal] -> Result FutureVal) FutureType
+               | Primitive ([FutureVal] -> Result FutureVal)
                | Function { params :: [(String, FutureType)]
                           , vararg :: Maybe (String, FutureType)
                           , body :: [FutureVal]
@@ -65,6 +65,7 @@ instance Eq FutureVal where
   (==) (List a) (List b) = a == b
   (==) (DottedList as a) (DottedList bs b) = (a == b) && (as == bs)
   (==) (Vector a) (Vector b) = a == b
+  (==) (TypeConst _ a) (TypeConst _ b) = a == b
 
 instance Ord FutureVal where
   (<=) (Atom a) (Atom b) = a <= b
@@ -77,6 +78,7 @@ instance Ord FutureVal where
   (<=) (List a) (List b) = a <= b
   (<=) (DottedList as a) (DottedList bs b) = (a <= b) && (as <= bs)
   (<=) (Vector a) (Vector b) = a <= b
+  (<=) (TypeConst _ a) (TypeConst _ b) = a <= b
 
 instance Show FutureVal where
   show v@(Atom a) = showType v ++ " " ++ a 
@@ -93,7 +95,8 @@ instance Show FutureVal where
                              "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
   show val@(Vector v) = showType val ++ " " ++
                         "(" ++ (unwordsList . Vector.toList) v ++ ")"
-  show v@(Primitive _) = showType v ++ " <primitive>"
+  show v@(Primitive _) = showType v
+  show v@(TypeConst _ t) = "(" ++ showType v ++ " " ++ show t ++ ")"
   show v@(Function { params = args
                    , vararg = varargs
                    , body = body
@@ -116,6 +119,7 @@ showVal v@(List xs) = "(" ++ unwordsList xs ++ ")"
 showVal v@(DottedList x xs) = "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
 showVal val@(Vector v) = "(" ++ (unwordsList . Vector.toList) v ++ ")"
 showVal v@(Primitive _) = "<primitive>"
+showVal (TypeConst _ t) = show t
 showVal v@(Function { params = args
                    , vararg = varargs
                    , body = _
@@ -136,7 +140,7 @@ getType (Ratio _) = Ratio
 getType (List _) = List Any
 getType (DottedList _ x) = DottedList Any (getType x)
 getType (Vector _) = Vector Any
-getType (Primitive _ t) = t
+getType (Primitive _) = PrimitiveFunc
 getType (TypeConst _ _) = Type
 getType (Function p Nothing _ _) = Func { params = [t | (_,t) <- p, t]
                                         , vararg = Nothing
@@ -203,6 +207,7 @@ data FutureType = Symbol
                 | Custom String [FutureType]
                 | Any
                 | Type
+                | PrimitiveFunc
                 | Func { params = [FutureType]
                        , vararg = Maybe FutureType
                        , result = FutureType
@@ -222,6 +227,7 @@ instance Show FutureType where
   show (List t) = "(:List " ++ show t ++ ")"
   show (DottedList a b) = "(:DottedList " ++ show a ++ " " ++ show b ++ ")"
   show (Vector t) = "(:Vector " ++ show t ++ ")"
+  show (PrimitiveFunc) = "(:Function <primitive>)"
   show (Func args Nothing return) = "(:Function (" ++ unwords (map show args) ++
                                     ") " ++ show return ++ ")"
   show (Func args (Just vararg) return) = "(:Function (" ++ unwords (map show args) ++
