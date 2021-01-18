@@ -142,14 +142,16 @@ getType (DottedList _ x) = DottedList Any (getType x)
 getType (Vector _) = Vector Any
 getType (Primitive _) = PrimitiveFunc
 getType (TypeConst _ _) = Type
-getType (Function p Nothing _ _) = Func { params = [t | (_,t) <- p, t]
-                                        , vararg = Nothing
-                                        , result = Any
-                                        }
-getType (Function p (Just (_,v)) _ _) = Func { params = [t | (_,t) <- p, t]
-                                             , vararg = Just v
-                                             , result = Any
-                                             }
+getType (Function p Nothing _ _) =
+  Func { params = [t | (_,t) <- p, t]
+       , vararg = Nothing
+       , result = Any
+       }
+getType (Function p (Just (_,v)) _ _) =
+  Func { params = [t | (_,t) <- p, t]
+       , vararg = Just v
+       , result = Any
+       }
 
 showType :: FutureVal -> String
 showType = show $ getType
