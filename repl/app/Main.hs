@@ -1,7 +1,7 @@
 module Main where
 
 import Parser (readExpr)
-import Evaluator (eval, primitives)
+import Evaluator (eval, primOps, primTypes)
 import Types (
     Env
   , FutureVal(..)
@@ -37,7 +37,9 @@ until_ pred prompt action = do
       else action result >> until_ pred prompt action
 
 primitiveBindings :: IO Env
-primitiveBindings = nullEnv >>= (flip bindVars $ map makePrimitive primitives)
+primitiveBindings = nullEnv
+                >>= (flip bindVars $ map makePrimitive primOps)
+                >>= (flip bindVars primTypes)
     where makePrimitive (var, func) = (var, Primitive func)
 
 runOne :: String -> IO ()

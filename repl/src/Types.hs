@@ -215,12 +215,15 @@ data FutureType = SymbolT
                         }
                 deriving (Eq)
 
+basicType :: FutureType -> FutureVal
+basicType = TypeConst []
+
 instance Show FutureType where
   show (SymbolT) = ":Symbol"
   show (StringT) = ":String"
   show (CharT) = ":Char"
   show (BoolT) = ":Bool"
-  show (IntegerT) = ":Integer"
+  show (IntegerT) = ":Int"
   show (FloatT) = ":Float"
   show (RatioT) = ":Ratio"
   show (AnyT) = ":Any"

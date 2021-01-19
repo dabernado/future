@@ -103,40 +103,44 @@ apply (Function params varargs body env) args =
                 Nothing -> return env
 
 zipTypes :: [(String, FutureType)] -> [FutureVal] -> IOResult [(String, FutureVal)]
-zipTypes ((var,t):params) (val:args) =
-  if (getType val) == t
-     then do
-       xs <- zipTypes params args
-       return $ (var,val):xs
-     else throwError $ TypeError t (getType val)
+zipTypes [] [] = return []
+zipTypes [] args = throwError $ NumArgs 0 args
+zipTypes params [] = throwError $ NumArgs (length params) []
+zipTypes ((var,t):params) (val:args) = case t of
+  AnyT -> (zipTypes params args) >>= (return . ((:) (var,val)))
+  _   -> if (getType val) == t
+           then do
+             xs <- zipTypes params args
+             return $ (var,val):xs
+           else throwError $ TypeError t (getType val)
 
-primitives :: [(String, [FutureVal] -> Result FutureVal)]
-primitives = [ ("+", numBinop (+))
-             , ("-", numBinop (-))
-             , ("*", numBinop (*))
-             , ("/", numBinop (/))
-             , ("mod", intBinop mod)
-             , ("quot", intBinop quot)
-             , ("rem", intBinop rem)
-             , ("=", valBinop eq)
-             , ("/=", valBinop notEq)
-             , ("<", valBinop lt)
-             , (">", valBinop gt)
-             , ("<=", valBinop ltEq)
-             , (">=", valBinop gtEq)
-             , ("&&", boolBinop andF)
-             , ("||", boolBinop orF)
-             , ("++", strBinop concatF)
-             , ("car", car)
-             , ("cdr", cdr)
-             , ("cons", cons)
-             , ("symbol?", isSymbol)
-             , ("symbol->string", symToString)
-             , ("string->symbol", strToSymbol)
-             , ("string", makeString)
-             , ("string-length", strLength)
-             , ("string-ref", indexString)
-             ]
+primOps :: [(String, [FutureVal] -> Result FutureVal)]
+primOps = [ ("+", numBinop (+))
+          , ("-", numBinop (-))
+          , ("*", numBinop (*))
+          , ("/", numBinop (/))
+          , ("mod", intBinop mod)
+          , ("quot", intBinop quot)
+          , ("rem", intBinop rem)
+          , ("=", valBinop eq)
+          , ("/=", valBinop notEq)
+          , ("<", valBinop lt)
+          , (">", valBinop gt)
+          , ("<=", valBinop ltEq)
+          , (">=", valBinop gtEq)
+          , ("&&", boolBinop andF)
+          , ("||", boolBinop orF)
+          , ("++", strBinop concatF)
+          , ("car", car)
+          , ("cdr", cdr)
+          , ("cons", cons)
+          , ("symbol?", isSymbol)
+          , ("symbol->string", symToString)
+          , ("string->symbol", strToSymbol)
+          , ("string", makeString)
+          , ("string-length", strLength)
+          , ("string-ref", indexString)
+          ]
   where
     numBinop = binop numBinopTypeCheck
     intBinop = binop intBinopTypeCheck
@@ -252,3 +256,26 @@ strBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
 strBinopTypeCheck (String _) succ@(String _) = return succ
 strBinopTypeCheck a@(String _) b = throwError $ TypeError StringT (getType b)
 strBinopTypeCheck a _ = throwError $ TypeError StringT (getType a)
+
+
+-- Primitive Types --
+
+primTypes :: [(String, FutureVal)]
+primTypes = [ (":Symbol", basicType SymbolT)
+            , (":Bool", basicType BoolT)
+            , (":Char", basicType CharT)
+            , (":String", basicType StringT)
+            , (":Int", basicType IntegerT)
+            , (":Float", basicType FloatT)
+            , (":Ratio", basicType RatioT)
+            , (":Any", basicType AnyT)
+            , (":Type", basicType TypeT)
+            -- TODO: Implement nested types
+            , (":List", TypeConst [] (ListT AnyT))
+            , (":DottedList", TypeConst [] (DottedListT AnyT AnyT))
+            , (":Vector", TypeConst [] (VectorT AnyT))
+            , (":Function", TypeConst [] (FuncT { paramTypes = []
+                                                , varargType = Nothing 
+                                                , result = AnyT
+                                                }))
+            ]
