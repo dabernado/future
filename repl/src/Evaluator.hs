@@ -88,6 +88,7 @@ evalQQ env (List [Atom "unquote", val]) = eval env val
 --evalQQ (List [Atom "unquote-splicing", List val]) = eval val
 evalQQ env val@(List _) = return val
 
+-- TODO: add clause for type constructors
 apply :: FutureVal -> [FutureVal] -> IOResult FutureVal
 apply (Primitive func) args = liftResult $ func args
 apply (Function params varargs body env) args =
@@ -106,6 +107,13 @@ zipTypes :: [(String, FutureType)] -> [FutureVal] -> IOResult [(String, FutureVa
 zipTypes [] [] = return []
 zipTypes [] args = throwError $ NumArgs 0 args
 zipTypes params [] = throwError $ NumArgs (length params) []
+zipTypes ((var,func@(FuncT _ _ _)):params) (val:args) = case val of
+  Primitive _ -> (zipTypes params args) >>= (return . ((:) (var,val)))
+  _           -> if (getType val) == func
+                    then do
+                      xs <- zipTypes params args
+                      return $ (var,val):xs
+                    else throwError $ TypeError func (getType val)
 zipTypes ((var,t):params) (val:args) = case t of
   AnyT -> (zipTypes params args) >>= (return . ((:) (var,val)))
   _   -> if (getType val) == t
@@ -276,6 +284,6 @@ primTypes = [ (":Symbol", basicType SymbolT)
             , (":Vector", TypeConst [] (VectorT AnyT))
             , (":Function", TypeConst [] (FuncT { paramTypes = []
                                                 , varargType = Nothing 
-                                                , result = AnyT
+                                                , result = Just AnyT
                                                 }))
             ]

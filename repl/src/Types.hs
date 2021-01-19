@@ -144,12 +144,12 @@ getType (TypeConst _ _) = TypeT
 getType (Function p Nothing _ _) =
   FuncT { paramTypes = [t | (_,t) <- p]
         , varargType = Nothing
-        , result = AnyT
+        , result = Just AnyT
         }
 getType (Function p (Just _) _ _) =
   FuncT { paramTypes = [t | (_,t) <- p]
         , varargType = Just AnyT
-        , result = AnyT
+        , result = Just AnyT
         }
 
 showType :: FutureVal -> String
@@ -211,7 +211,7 @@ data FutureType = SymbolT
                 | PrimitiveFuncT
                 | FuncT { paramTypes :: [FutureType]
                         , varargType :: Maybe FutureType
-                        , result :: FutureType
+                        , result :: Maybe FutureType
                         }
                 deriving (Eq)
 
