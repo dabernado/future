@@ -21,7 +21,7 @@ eval env (List [Atom "if", pred, conseq, alt]) = do
   case result of
     Bool False -> eval env alt
     Bool True -> eval env conseq
-    _ -> throwError $ TypeError (Bool True) result
+    _ -> throwError $ TypeError BoolT (getType result)
 eval env form@(List (Atom "cond" : clauses)) =
   if null clauses
   then throwError $ BadSpecialForm "no clause in cond expression: " form
@@ -61,17 +61,21 @@ eval env (List (func : args)) = do
   apply f argVals
 eval env badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
-makeFunc varargs env params body =
-  return $ Function (expandParams env params) varargs body env
+makeFunc varargs env params body = do
+  p <- expandParams env params
+  return $ Function p varargs body env
 makeNormalFunc = makeFunc Nothing
 makeVarArgs = makeFunc . Just . showVal
 
-expandParams :: Env -> [FutureVal] -> [(String, FutureType)]
-expandParams env (Atom t@(':':_) : Atom id : params) =
-  let asType (TypeConst _ t) = t
-  in (id, asType $ getVar env t) : (expandParams env params)
-expandParams env (Atom id : params) = (id, AnyT) : (expandParams env params)
-expandParams env [] = []
+expandParams :: Env -> [FutureVal] -> IOResult [(String, FutureType)]
+expandParams env (Atom const@(':':_) : Atom id : params) = do
+  TypeConst _ t <- getVar env const
+  xs <- expandParams env params
+  return $ (id, t) : xs
+expandParams env (Atom id : params) = do
+  xs <- expandParams env params
+  return $ (id, AnyT) : xs
+expandParams env [] = return []
 
 evalQQ :: Env -> FutureVal -> IOResult FutureVal
 evalQQ env val@(Char _) = return val
@@ -89,12 +93,22 @@ apply (Primitive func) args = liftResult $ func args
 apply (Function params varargs body env) args =
       if length params /= length args && varargs == Nothing
          then throwError $ NumArgs (length params) args
-         else (liftIO $ bindVars env $ zip params args) >>= bindVarArgs varargs >>= evalBody
+         else do
+           argVals <- zipTypes params args
+           (liftIO $ bindVars env argVals) >>= bindVarArgs varargs >>= evalBody
       where remainingArgs = drop (length params) args
             evalBody env = liftM last $ mapM (eval env) body
             bindVarArgs arg env = case arg of
                 Just argName -> liftIO $ bindVars env [(argName, List $ remainingArgs)]
                 Nothing -> return env
+
+zipTypes :: [(String, FutureType)] -> [FutureVal] -> IOResult [(String, FutureVal)]
+zipTypes ((var,t):params) (val:args) =
+  if (getType val) == t
+     then do
+       xs <- zipTypes params args
+       return $ (var,val):xs
+     else throwError $ TypeError t (getType val)
 
 primitives :: [(String, [FutureVal] -> Result FutureVal)]
 primitives = [ ("+", numBinop (+))
@@ -104,12 +118,12 @@ primitives = [ ("+", numBinop (+))
              , ("mod", intBinop mod)
              , ("quot", intBinop quot)
              , ("rem", intBinop rem)
-             , ("=", genBinop eq)
-             , ("/=", genBinop notEq)
-             , ("<", genBinop lt)
-             , (">", genBinop gt)
-             , ("<=", genBinop ltEq)
-             , (">=", genBinop gtEq)
+             , ("=", valBinop eq)
+             , ("/=", valBinop notEq)
+             , ("<", valBinop lt)
+             , (">", valBinop gt)
+             , ("<=", valBinop ltEq)
+             , (">=", valBinop gtEq)
              , ("&&", boolBinop andF)
              , ("||", boolBinop orF)
              , ("++", strBinop concatF)
@@ -126,7 +140,7 @@ primitives = [ ("+", numBinop (+))
   where
     numBinop = binop numBinopTypeCheck
     intBinop = binop intBinopTypeCheck
-    genBinop = binop genBinopTypeCheck
+    valBinop = binop valBinopTypeCheck
     boolBinop = binop boolBinopTypeCheck
     strBinop = binop strBinopTypeCheck
     eq a b = Bool $ a == b
@@ -142,14 +156,14 @@ primitives = [ ("+", numBinop (+))
 car :: [FutureVal] -> Result FutureVal
 car [List (x:xs)] = return x
 car [DottedList (x:xs) _] = return x
-car [arg] = throwError $ TypeError (List []) arg
+car [arg] = throwError $ TypeError (ListT AnyT) (getType arg)
 car args = throwError $ NumArgs 1 args
 
 cdr :: [FutureVal] -> Result FutureVal
 cdr [List (x : xs)] = return $ List xs
 cdr [DottedList [_] x] = return x
 cdr [DottedList (_ : xs) x] = return $ DottedList xs x
-cdr [arg] = throwError $ TypeError (List []) arg 
+cdr [arg] = throwError $ TypeError (ListT AnyT) (getType arg) 
 cdr args = throwError $ NumArgs 1 args
 
 cons :: [FutureVal] -> Result FutureVal
@@ -168,13 +182,13 @@ isSymbol n = throwError $ NumArgs 1 n
 symToString :: [FutureVal] -> Result FutureVal
 symToString [] = throwError $ NumArgs 1 []
 symToString [Atom a] = return $ String a
-symToString [t] = throwError $ TypeError (Atom "") t
+symToString [t] = throwError $ TypeError SymbolT (getType t)
 symToString n = throwError $ NumArgs 1 n
 
 strToSymbol :: [FutureVal] -> Result FutureVal
 strToSymbol [] = throwError $ NumArgs 1 []
 strToSymbol [String s] = return $ Atom s
-strToSymbol [t] = throwError $ TypeError (String "") t
+strToSymbol [t] = throwError $ TypeError StringT (getType t)
 strToSymbol n = throwError $ NumArgs 1 n
 
 makeString :: [FutureVal] -> Result FutureVal
@@ -186,19 +200,19 @@ makeString cs = case charTypeCheck cs of
     charTypeCheck :: [FutureVal] -> Result FutureVal
     charTypeCheck (Char _ : cs) = charTypeCheck cs
     charTypeCheck [] = return $ Bool True
-    charTypeCheck (x:xs) = throwError $ TypeError (Char ' ') x
+    charTypeCheck (x:xs) = throwError $ TypeError CharT (getType x)
 
 strLength :: [FutureVal] -> Result FutureVal
 strLength [] = throwError $ NumArgs 1 []
 strLength [String s] = return $ Integer (length s)
-strLength [t] = throwError $ TypeError (String "") t
+strLength [t] = throwError $ TypeError StringT (getType t)
 strLength n = throwError $ NumArgs 1 n
 
 indexString :: [FutureVal] -> Result FutureVal
 indexString [] = throwError $ NumArgs 1 []
 indexString [Integer n, String s] = return $ Char (s !! n)
-indexString [a@(Integer _), b] = throwError $ TypeError a b
-indexString [a, _] = throwError $ TypeError (Integer 0) a
+indexString [Integer _, b] = throwError $ TypeError IntegerT (getType b)
+indexString [a, _] = throwError $ TypeError IntegerT (getType a)
 indexString n = throwError $ NumArgs 1 n
 
 binop :: (FutureVal -> FutureVal -> Result FutureVal) -> (FutureVal -> FutureVal -> FutureVal) -> [FutureVal] -> Result FutureVal
@@ -208,33 +222,33 @@ binop typeCheck op params@(x:xs) = case foldM typeCheck x xs of
                            err@(Left _) -> err
                            Right _ -> (return . foldl1 op) params
 
-genBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
-genBinopTypeCheck a@(Primitive _) _ = throwError $ TypeError (Integer 0) a
-genBinopTypeCheck a@(Function _ _ _ _) _ = throwError $ TypeError (Integer 0) a
-genBinopTypeCheck a b = if (showType a) == (showType b)
+valBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
+valBinopTypeCheck (Primitive _) _ = throwError $ TypeError IntegerT PrimitiveFuncT
+valBinopTypeCheck a@(Function _ _ _ _) _ = throwError $ TypeError IntegerT (getType a)
+valBinopTypeCheck a b = if (showType a) == (showType b)
                         then return b
-                        else throwError $ TypeError a b
+                        else throwError $ TypeError (getType a) (getType b)
 
 numBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
 numBinopTypeCheck (Integer _) succ@(Integer _) = return succ
 numBinopTypeCheck (Float _) succ@(Float _) = return succ
 numBinopTypeCheck (Ratio _) succ@(Ratio _) = return succ
-numBinopTypeCheck a@(Integer _) b@_ = throwError $ TypeError a b
-numBinopTypeCheck a@(Float _) b@_ = throwError $ TypeError a b
-numBinopTypeCheck a@(Ratio _) b@_ = throwError $ TypeError a b
-numBinopTypeCheck a@_ _ = throwError $ TypeError (Integer 0) a
+numBinopTypeCheck (Integer _) b = throwError $ TypeError IntegerT (getType b)
+numBinopTypeCheck (Float _) b = throwError $ TypeError FloatT (getType b)
+numBinopTypeCheck (Ratio _) b = throwError $ TypeError RatioT (getType b)
+numBinopTypeCheck a _ = throwError $ TypeError IntegerT (getType a)
 
 intBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
 intBinopTypeCheck (Integer _) succ@(Integer _) = return succ
-intBinopTypeCheck a@(Integer _) b@_ = throwError $ TypeError a b
-intBinopTypeCheck a@_ _ = throwError $ TypeError (Integer 0) a
+intBinopTypeCheck (Integer _) b = throwError $ TypeError IntegerT (getType b)
+intBinopTypeCheck a _ = throwError $ TypeError IntegerT (getType a)
 
 boolBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
 boolBinopTypeCheck (Bool _) succ@(Bool _) = return succ
-boolBinopTypeCheck a@(Bool _) b@_ = throwError $ TypeError a b
-boolBinopTypeCheck a@_ _ = throwError $ TypeError (Bool False) a
+boolBinopTypeCheck (Bool _) b = throwError $ TypeError BoolT (getType b)
+boolBinopTypeCheck a _ = throwError $ TypeError BoolT (getType a)
 
 strBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
 strBinopTypeCheck (String _) succ@(String _) = return succ
-strBinopTypeCheck a@(String _) b@_ = throwError $ TypeError a b
-strBinopTypeCheck a@_ _ = throwError $ TypeError (String "") a
+strBinopTypeCheck a@(String _) b = throwError $ TypeError StringT (getType b)
+strBinopTypeCheck a _ = throwError $ TypeError StringT (getType a)

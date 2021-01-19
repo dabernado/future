@@ -238,7 +238,7 @@ instance Show FutureType where
   show (CustomT t args) = "(:" ++ t ++ " " ++ unwords (map show args) ++ ")"
 
 data FutureError = NumArgs Int [FutureVal]
-                 | TypeError FutureVal FutureVal
+                 | TypeError FutureType FutureType
                  | Parser ParseError
                  | BadSpecialForm String FutureVal
                  | NotFunction String String
@@ -263,8 +263,8 @@ instance Show FutureError where
   show (NotFunction msg func) = msg ++ " - " ++ func
   show (NumArgs exp found) = "Expected " ++ show exp ++
                              " args; found " ++ unwordsList found
-  show (TypeError exp found) = "Type error - expected " ++ showType exp ++
-                               ", found " ++ showType found
+  show (TypeError exp found) = "Type error - expected " ++ show exp ++
+                               ", found " ++ show found
   show (Parser err) = "Parse error at " ++ show err
 
 trapError action = catchError action (return . show)
