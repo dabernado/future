@@ -1,7 +1,8 @@
 module Main where
 
 import Parser (readExpr)
-import Evaluator (eval, primOps, primTypes)
+import Evaluator (eval)
+import Primitives (primOps, primTypes)
 import Types (
     Env
   , FutureVal(..)

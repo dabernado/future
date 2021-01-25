@@ -37,16 +37,17 @@ bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
     where extendEnv bindings env = liftM (++ env) (return bindings)
 
 data FutureVal = Atom String
-               | List [FutureVal]
-               | DottedList [FutureVal] FutureVal
-               | Vector (Vector FutureVal)
                | Integer Int
                | Float Double
                | Ratio Rational
                | String String
                | Char Char
                | Bool Bool
-               | TypeConst [FutureType] FutureType
+               | Type FutureType
+             -- TODO: Add type info to collections
+               | List [FutureVal]
+               | DottedList [FutureVal] FutureVal
+               | Vector (Vector FutureVal)
                | Primitive ([FutureVal] -> Result FutureVal)
                | Function { params :: [(String, FutureType)]
                           , vararg :: Maybe String
@@ -65,7 +66,7 @@ instance Eq FutureVal where
   (==) (List a) (List b) = a == b
   (==) (DottedList as a) (DottedList bs b) = (a == b) && (as == bs)
   (==) (Vector a) (Vector b) = a == b
-  (==) (TypeConst _ a) (TypeConst _ b) = a == b
+  (==) (Type a ) (Type b ) = a == b
 
 instance Ord FutureVal where
   (<=) (Atom a) (Atom b) = a <= b
@@ -95,7 +96,7 @@ instance Show FutureVal where
   show val@(Vector v) = showType val ++ " " ++
                         "(" ++ (unwordsList . Vector.toList) v ++ ")"
   show v@(Primitive _) = showType v
-  show v@(TypeConst _ t) = "(" ++ showType v ++ " " ++ show t ++ ")"
+  show v@(Type t ) = show t
   show v@(Function { params = args
                    , vararg = varargs
                    , body = body
@@ -118,7 +119,7 @@ showVal v@(List xs) = "(" ++ unwordsList xs ++ ")"
 showVal v@(DottedList x xs) = "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
 showVal val@(Vector v) = "(" ++ (unwordsList . Vector.toList) v ++ ")"
 showVal v@(Primitive _) = "<primitive>"
-showVal (TypeConst _ t) = show t
+showVal (Type t) = show t
 showVal v@(Function { params = args
                    , vararg = varargs
                    , body = _
@@ -140,15 +141,13 @@ getType (List _) = ListT AnyT
 getType (DottedList _ x) = DottedListT AnyT (getType x)
 getType (Vector _) = VectorT AnyT
 getType (Primitive _) = PrimitiveFuncT
-getType (TypeConst _ _) = TypeT
+getType (Type _ ) = TypeT
 getType (Function p Nothing _ _) =
-  FuncT { paramTypes = [t | (_,t) <- p]
-        , varargType = Nothing
+  FuncT { paramsType = List [Type t | (_,t) <- p]
         , result = Just AnyT
         }
-getType (Function p (Just _) _ _) =
-  FuncT { paramTypes = [t | (_,t) <- p]
-        , varargType = Just AnyT
+getType (Function p (Just t) _ _) =
+  FuncT { paramsType = DottedList [Type t | (_,t) <- p] (Type AnyT)
         , result = Just AnyT
         }
 
@@ -209,14 +208,13 @@ data FutureType = SymbolT
                 | AnyT
                 | TypeT
                 | PrimitiveFuncT
-                | FuncT { paramTypes :: [FutureType]
-                        , varargType :: Maybe FutureType
+                | FuncT { paramsType :: FutureVal
                         , result :: Maybe FutureType
                         }
+                | TypeConst { args :: Int
+                            , returnType :: FutureType
+                            }
                 deriving (Eq)
-
-basicType :: FutureType -> FutureVal
-basicType = TypeConst []
 
 instance Show FutureType where
   show (SymbolT) = ":Symbol"
@@ -232,13 +230,14 @@ instance Show FutureType where
   show (DottedListT a b) = "(:DottedList " ++ show a ++ " " ++ show b ++ ")"
   show (VectorT t) = "(:Vector " ++ show t ++ ")"
   show (PrimitiveFuncT) = "(:Function <primitive>)"
-  show (FuncT args Nothing return) = "(:Function (" ++ unwords (map show args) ++
+  show (FuncT (List args) return) = "(:Function (" ++ unwords (map show args) ++
                                     ") " ++ show return ++ ")"
-  show (FuncT args (Just vararg) return) = "(:Function (" ++ unwords (map show args) ++
-                                          " . " ++ show vararg ++
-                                          ") " ++ show return ++ ")"
+  show (FuncT (DottedList args vararg) return) = "(:Function (" ++ unwords (map show args)
+                                                 ++ " . " ++ show vararg ++
+                                                 ") " ++ show return ++ ")"
   show (CustomT t []) = ":" ++ t
   show (CustomT t args) = "(:" ++ t ++ " " ++ unwords (map show args) ++ ")"
+  show (TypeConst _ t) = show t
 
 data FutureError = NumArgs Int [FutureVal]
                  | TypeError FutureType FutureType
