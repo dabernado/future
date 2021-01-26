@@ -149,7 +149,6 @@ zipTypes ((var,t):params) (val:args) = case t of
                         else throwError $ TypeError t (getType val)
 
 -- TODO: add clauses for custom types and functions
--- TODO: refactor for updated collection vals
 constructVal :: FutureType -> FutureVal -> IOResult FutureVal
 constructVal (ListT t) (List _ v) = do
   vals <- mapM (constructVal t) v
