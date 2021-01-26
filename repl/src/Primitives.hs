@@ -48,23 +48,29 @@ primOps = [ ("+", numBinop (+))
     concatF (String a) (String b) = String $ a ++ b
 
 car :: [FutureVal] -> Result FutureVal
-car [List (x:xs)] = return x
-car [DottedList (x:xs) _] = return x
+car [List _ (x:xs)] = return x
+car [DottedList _ (x:xs) _] = return x
 car [arg] = throwError $ TypeError (ListT AnyT) (getType arg)
 car args = throwError $ NumArgs 1 args
 
 cdr :: [FutureVal] -> Result FutureVal
-cdr [List (x : xs)] = return $ List xs
-cdr [DottedList [_] x] = return x
-cdr [DottedList (_ : xs) x] = return $ DottedList xs x
+cdr [List t (x : xs)] = return $ List t xs
+cdr [DottedList _ [_] x] = return x
+cdr [DottedList t (_ : xs) x] = return $ DottedList t xs x
 cdr [arg] = throwError $ TypeError (ListT AnyT) (getType arg) 
 cdr args = throwError $ NumArgs 1 args
 
 cons :: [FutureVal] -> Result FutureVal
-cons [x, List []] = return $ List [x]
-cons [x, List xs] = return $ List (x:xs)
-cons [x, DottedList xs xlast] = return $ DottedList (x:xs) xlast
-cons [x, y] = return $ DottedList [x] y
+cons [x, List t []] = if checkType t x
+                         then return $ List t [x]
+                         else throwError $ TypeError t (getType x)
+cons [x, List t xs] = if checkType t x
+                         then return $ List t (x:xs)
+                         else throwError $ TypeError t (getType x)
+cons [x, DottedList t@(t1,_) xs xlast] = if checkType t1 x
+                                            then return $ DottedList t (x:xs) xlast
+                                            else throwError $ TypeError t1 (getType x)
+cons [x, y] = return $ DottedList (AnyT, AnyT) [x] y
 cons args = throwError $ NumArgs 2 args
 
 isSymbol :: [FutureVal] -> Result FutureVal
@@ -158,7 +164,7 @@ primTypes = [ (":Symbol", Type SymbolT)
             , (":Int", Type IntegerT)
             , (":Float", Type FloatT)
             , (":Ratio", Type RatioT)
-            , (":Any", Type AnyT)
+            , (":?", Type AnyT)
             , (":Type", Type TypeT)
             , (":List", Type TypeConst { args = 1, returnType = ListT AnyT })
             , (":DottedList", Type TypeConst { args = 2
@@ -166,7 +172,7 @@ primTypes = [ (":Symbol", Type SymbolT)
                                              })
             , (":Vector", Type TypeConst { args = 1, returnType = VectorT AnyT })
             , (":Function", Type TypeConst { args = 2
-                                           , returnType = FuncT { paramsType = List []
+                                           , returnType = FuncT { paramsType = List AnyT []
                                                                 , result = Just AnyT
                                                                 }
                                            })

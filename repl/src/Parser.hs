@@ -17,13 +17,13 @@ spaces :: Parser ()
 spaces = skipMany (char ',') >> skipMany1 space
 
 parseList :: Parser FutureVal
-parseList = liftM List $ sepBy parseExpr spaces
+parseList = liftM (List AnyT) $ sepBy parseExpr spaces
 
 parseDottedList :: Parser FutureVal
 parseDottedList = do
     head <- endBy parseExpr spaces
     tail <- char '.' >> spaces >> parseExpr
-    return $ DottedList head tail
+    return $ DottedList (AnyT, AnyT) head tail
 
 parseAnyList :: Parser FutureVal
 parseAnyList = do
@@ -37,14 +37,14 @@ parseVector = do
     char '['
     xs <- sepBy parseExpr spaces
     char ']'
-    return $ Vector $ Vector.fromList xs
+    return $ Vector AnyT $ Vector.fromList xs
 
 parseMap :: Parser FutureVal
 parseMap = do
     char '{'
     xs <- sepBy parseKV spaces
     char '}'
-    return $ List [Atom ":Map", List (concat xs)]
+    return $ List AnyT [Atom ":Map", List AnyT (concat xs)]
   where
     parseKV = do
         key <- parseExpr
@@ -63,7 +63,7 @@ parseSet = do
     char '{'
     xs <- sepBy parseExpr spaces
     char '}'
-    return $ List [Atom ":Set", List xs]
+    return $ List AnyT [Atom ":Set", List AnyT xs]
 
 parseAnonFunc :: Parser FutureVal
 parseAnonFunc = do
@@ -72,8 +72,10 @@ parseAnonFunc = do
     char ')'
     let args = sortArgs $ nub (filter isAnonArg xs)
     return $ if last args == (Atom "%&")
-                then List (Atom "fn" : DottedList (init args) (last args) : [List xs])
-                else List (Atom "fn" : List args : [List xs])
+                then List AnyT (Atom "fn"
+                               : DottedList (AnyT, AnyT) (init args) (last args)
+                               : [List AnyT xs])
+                else List AnyT (Atom "fn" : List AnyT args : [List AnyT xs])
   where
     parseAnonArg = do
       char '%'
@@ -97,13 +99,13 @@ parseQuoted :: Parser FutureVal
 parseQuoted = do
     char '\''
     x <- parseExpr
-    return $ List [Atom "quote", x]
+    return $ List AnyT [Atom "quote", x]
 
 parseQuasiQuoted :: Parser FutureVal
 parseQuasiQuoted = do
     char '`'
     x <- parseQQExpr
-    return $ List [Atom "quasiquote", x]
+    return $ List AnyT [Atom "quasiquote", x]
   where
     parseTilde = do
         char '~'
@@ -112,16 +114,16 @@ parseQuasiQuoted = do
           Just xs -> return xs
           Nothing -> do
             x <- parseQQExpr
-            return $ List [Atom "unquote", x]
+            return $ List AnyT [Atom "unquote", x]
     parseAtSymbol = do
         char '@'
         x <- parseAnyQQList
-        return $ List [Atom "unquote-splicing", x]
-    parseQQList = liftM List $ sepBy parseQQExpr spaces
+        return $ List AnyT [Atom "unquote-splicing", x]
+    parseQQList = liftM (List AnyT) $ sepBy parseQQExpr spaces
     parseQQDottedList = do
         head <- endBy parseQQExpr spaces
         tail <- char '.' >> spaces >> parseQQExpr
-        return $ DottedList head tail
+        return $ DottedList (AnyT, AnyT) head tail
     parseAnyQQList = do
         char '('
         x <- try parseQQList <|> parseQQDottedList

@@ -44,12 +44,12 @@ data FutureVal = Atom String
                | Char Char
                | Bool Bool
                | Type FutureType
-             -- TODO: Add type info to collections
-               | List [FutureVal]
-               | DottedList [FutureVal] FutureVal
-               | Vector (Vector FutureVal)
+               | List FutureType [FutureVal]
+               | Vector FutureType (Vector FutureVal)
+               | DottedList (FutureType, FutureType) [FutureVal] FutureVal
                | Primitive ([FutureVal] -> Result FutureVal)
                | Function { params :: [(String, FutureType)]
+                          -- TODO: Add type info to vararg
                           , vararg :: Maybe String
                           , body :: [FutureVal]
                           , closure :: Env
@@ -63,9 +63,9 @@ instance Eq FutureVal where
   (==) (Integer a) (Integer b) = a == b
   (==) (Float a) (Float b) = a == b
   (==) (Ratio a) (Ratio b) = a == b
-  (==) (List a) (List b) = a == b
-  (==) (DottedList as a) (DottedList bs b) = (a == b) && (as == bs)
-  (==) (Vector a) (Vector b) = a == b
+  (==) (List _ a) (List _ b) = a == b
+  (==) (DottedList _ as a) (DottedList _ bs b) = (a == b) && (as == bs)
+  (==) (Vector _ a) (Vector _ b) = a == b
   (==) (Type a ) (Type b ) = a == b
 
 instance Ord FutureVal where
@@ -76,9 +76,9 @@ instance Ord FutureVal where
   (<=) (Integer a) (Integer b) = a <= b
   (<=) (Float a) (Float b) = a <= b
   (<=) (Ratio a) (Ratio b) = a <= b
-  (<=) (List a) (List b) = a <= b
-  (<=) (DottedList as a) (DottedList bs b) = (a <= b) && (as <= bs)
-  (<=) (Vector a) (Vector b) = a <= b
+  (<=) (List _ a) (List _ b) = a <= b
+  (<=) (DottedList _ as a) (DottedList _ bs b) = (a <= b) && (as <= bs)
+  (<=) (Vector _ a) (Vector _ b) = a <= b
 
 instance Show FutureVal where
   show v@(Atom a) = showType v ++ " " ++ a 
@@ -90,10 +90,10 @@ instance Show FutureVal where
   show v@(Float f) = showType v ++ " " ++ show f
   show v@(Ratio r) = showType v ++ " " ++
                      show (numerator r) ++ "/" ++ show (denominator r)
-  show v@(List xs) = showType v ++ " " ++ "(" ++ unwordsList xs ++ ")"
-  show v@(DottedList x xs) = showType v ++ " " ++
+  show v@(List _ xs) = showType v ++ " " ++ "(" ++ unwordsList xs ++ ")"
+  show v@(DottedList _ x xs) = showType v ++ " " ++
                              "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
-  show val@(Vector v) = showType val ++ " " ++
+  show val@(Vector _ v) = showType val ++ " " ++
                         "(" ++ (unwordsList . Vector.toList) v ++ ")"
   show v@(Primitive _) = showType v
   show v@(Type t ) = show t
@@ -115,9 +115,9 @@ showVal v@(Bool False) = "false"
 showVal v@(Integer n) = show n
 showVal v@(Float f) = show f
 showVal v@(Ratio r) = show (numerator r) ++ "/" ++ show (denominator r)
-showVal v@(List xs) = "(" ++ unwordsList xs ++ ")"
-showVal v@(DottedList x xs) = "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
-showVal val@(Vector v) = "(" ++ (unwordsList . Vector.toList) v ++ ")"
+showVal v@(List _ xs) = "(" ++ unwordsList xs ++ ")"
+showVal v@(DottedList _ x xs) = "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
+showVal val@(Vector _ v) = "(" ++ (unwordsList . Vector.toList) v ++ ")"
 showVal v@(Primitive _) = "<primitive>"
 showVal (Type t) = show t
 showVal v@(Function { params = args
@@ -137,17 +137,17 @@ getType (Bool _) = BoolT
 getType (Integer _) = IntegerT
 getType (Float _) = FloatT
 getType (Ratio _) = RatioT
-getType (List _) = ListT AnyT
-getType (DottedList _ x) = DottedListT AnyT (getType x)
-getType (Vector _) = VectorT AnyT
+getType (List t _) = ListT t
+getType (DottedList (t1,t2) _ _) = DottedListT t1 t2
+getType (Vector t _) = VectorT t
 getType (Primitive _) = PrimitiveFuncT
 getType (Type _ ) = TypeT
 getType (Function p Nothing _ _) =
-  FuncT { paramsType = List [Type t | (_,t) <- p]
+  FuncT { paramsType = List TypeT [Type t | (_,t) <- p]
         , result = Just AnyT
         }
-getType (Function p (Just t) _ _) =
-  FuncT { paramsType = DottedList [Type t | (_,t) <- p] (Type AnyT)
+getType (Function p (Just _) _ _) =
+  FuncT { paramsType = DottedList (TypeT, TypeT) [Type t | (_,t) <- p] (Type AnyT)
         , result = Just AnyT
         }
 
@@ -230,14 +230,18 @@ instance Show FutureType where
   show (DottedListT a b) = "(:DottedList " ++ show a ++ " " ++ show b ++ ")"
   show (VectorT t) = "(:Vector " ++ show t ++ ")"
   show (PrimitiveFuncT) = "(:Function <primitive>)"
-  show (FuncT (List args) return) = "(:Function (" ++ unwords (map show args) ++
+  show (FuncT (List _ args) return) = "(:Function (" ++ unwords (map show args) ++
                                     ") " ++ show return ++ ")"
-  show (FuncT (DottedList args vararg) return) = "(:Function (" ++ unwords (map show args)
+  show (FuncT (DottedList _ args vararg) return) = "(:Function (" ++ unwords (map show args)
                                                  ++ " . " ++ show vararg ++
                                                  ") " ++ show return ++ ")"
   show (CustomT t []) = ":" ++ t
   show (CustomT t args) = "(:" ++ t ++ " " ++ unwords (map show args) ++ ")"
   show (TypeConst _ t) = show t
+
+checkType :: FutureType -> FutureVal -> Bool
+checkType AnyT _ = True
+checkType t v = t == getType v
 
 data FutureError = NumArgs Int [FutureVal]
                  | TypeError FutureType FutureType

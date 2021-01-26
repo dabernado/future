@@ -12,50 +12,50 @@ eval env val@(Integer _) = return val
 eval env val@(Float _) = return val
 eval env val@(Ratio _) = return val
 eval env (Atom id) = getVar env id
-eval env (List [val]) = return val
-eval env (List [Atom "quote", val]) = return val
-eval env (List [Atom "quasiquote", List val]) = mapM (evalQQ env) val >>= (return . List)
-eval env (List [Atom "quasiquote", val]) = return val
-eval env (List [Atom "if", pred, conseq, alt]) = do
+eval env (List _ [val]) = return val
+eval env (List _ [Atom "quote", val]) = return val
+eval env (List _ [Atom "quasiquote", List _ val]) = mapM (evalQQ env) val >>= (return . List AnyT)
+eval env (List _ [Atom "quasiquote", val]) = return val
+eval env (List _ [Atom "if", pred, conseq, alt]) = do
   result <- eval env pred
   case result of
     Bool False -> eval env alt
     Bool True -> eval env conseq
     _ -> throwError $ TypeError BoolT (getType result)
-eval env form@(List (Atom "cond" : clauses)) =
+eval env form@(List _ (Atom "cond" : clauses)) =
   if null clauses
   then throwError $ BadSpecialForm "no clause in cond expression: " form
   else case head clauses of
-         List [Atom "else", val] -> eval env val
-         List [test, expr] -> eval env $ List [Atom "if"
-                                       , test
-                                       , expr
-                                       , List (Atom "cond" : tail clauses)]
+         List _ [Atom "else", val] -> eval env val
+         List _ [test, expr] -> eval env $ List AnyT [Atom "if"
+                                                     , test
+                                                     , expr
+                                                     , List AnyT (Atom "cond" : tail clauses)]
          _ -> throwError $ BadSpecialForm "ill-formed cond expression: " form
-eval env form@(List (Atom "case" : key : clauses)) =
+eval env form@(List _ (Atom "case" : key : clauses)) =
   if null clauses
   then throwError $ BadSpecialForm "no clause in case expression: " form
   else case head clauses of
-         List (Atom "else" : exprs) -> mapM (eval env) exprs >>= return . last
-         List (List datums : exprs) -> do
+         List _ (Atom "else" : exprs) -> mapM (eval env) exprs >>= return . last
+         List _ (List _ datums : exprs) -> do
            result <- eval env key
-           equality <- mapM (\x -> eval env (List [Atom "=", x, result])) datums
+           equality <- mapM (\x -> eval env (List AnyT [Atom "=", x, result])) datums
            if Bool True `elem` equality
               then mapM (eval env) exprs >>= return . last
-              else eval env $ List (Atom "case" : key : tail clauses)
+              else eval env $ List AnyT (Atom "case" : key : tail clauses)
          _ -> throwError $ BadSpecialForm "ill-formed case expression: " form
-eval env (List [Atom "def", Atom var, form]) = eval env form >>= defineVar env var
-eval env (List (Atom "defn" : Atom var : List params : body)) =
+eval env (List _ [Atom "def", Atom var, form]) = eval env form >>= defineVar env var
+eval env (List _ (Atom "defn" : Atom var : List _ params : body)) =
   makeNormalFunc env params body >>= defineVar env var
-eval env (List (Atom "defn" : Atom var : DottedList params varargs : body)) =
+eval env (List _ (Atom "defn" : Atom var : DottedList _ params varargs : body)) =
   makeVarArgs varargs env params body >>= defineVar env var
-eval env (List (Atom "fn" : List params : body)) =
+eval env (List _ (Atom "fn" : List _ params : body)) =
   makeNormalFunc env params body
-eval env (List (Atom "fn" : DottedList params varargs : body)) =
+eval env (List _ (Atom "fn" : DottedList _ params varargs : body)) =
   makeVarArgs varargs env params body
-eval env (List (Atom "fn" : varargs@(Atom _) : body)) =
+eval env (List _ (Atom "fn" : varargs@(Atom _) : body)) =
   makeVarArgs varargs env [] body
-eval env (List (func : args)) = do
+eval env (List _ (func : args)) = do
   f <- eval env func
   argVals <- mapM (eval env) args
   apply f argVals
@@ -77,7 +77,7 @@ expandParams env (Atom const@(':':_) : Atom id : params) = do
     _ -> do
       xs <- expandParams env params
       return $ (id, t) : xs
-expandParams env (const@(List (Atom (':':_) : _)) : Atom id : params) = do
+expandParams env (const@(List _ (Atom (':':_) : _)) : Atom id : params) = do
   result  <- eval env const
   case result of
     Type (TypeConst _ t) -> do
@@ -99,9 +99,9 @@ evalQQ env val@(Bool _) = return val
 evalQQ env val@(Integer _) = return val
 evalQQ env val@(Float _) = return val
 evalQQ env val@(Ratio _) = return val
-evalQQ env (List [Atom "unquote", val]) = eval env val
---evalQQ (List [Atom "unquote-splicing", List val]) = eval val
-evalQQ env val@(List _) = return val
+evalQQ env (List _ [Atom "unquote", val]) = eval env val
+--evalQQ (List _ [Atom "unquote-splicing", List _ val]) = eval val
+evalQQ env val@(List _ _) = return val
 
 -- TODO: add clause for function type constructors
 apply :: FutureVal -> [FutureVal] -> IOResult FutureVal
@@ -121,7 +121,7 @@ apply (Function params varargs body env) args =
       where remainingArgs = drop (length params) args
             evalBody env = liftM last $ mapM (eval env) body
             bindVarArgs arg env = case arg of
-                Just argName -> liftIO $ bindVars env [(argName, List $ remainingArgs)]
+                Just argName -> liftIO $ bindVars env [(argName, List AnyT $ remainingArgs)]
                 Nothing      -> return env
 
 zipTypes :: [(String, FutureType)] -> [FutureVal] -> IOResult [(String, FutureVal)]
@@ -151,16 +151,16 @@ zipTypes ((var,t):params) (val:args) = case t of
 -- TODO: add clauses for custom types and functions
 -- TODO: refactor for updated collection vals
 constructVal :: FutureType -> FutureVal -> IOResult FutureVal
-constructVal (ListT t) (List v) = do
+constructVal (ListT t) (List _ v) = do
   vals <- mapM (constructVal t) v
-  return $ List vals
-constructVal (DottedListT t1 t2) (DottedList vals var) = do
+  return $ List t vals
+constructVal (DottedListT t1 t2) (DottedList _ vals var) = do
   first <- mapM (constructVal t1) vals
   last <- constructVal t2 var
-  return $ DottedList first last
-constructVal (VectorT t) (Vector v) = do
+  return $ DottedList (t1,t2) first last
+constructVal (VectorT t) (Vector _ v) = do
   vals <- mapM (constructVal t) v
-  return $ Vector vals
+  return $ Vector t vals
 constructVal (TypeConst _ t) v = constructVal t v
 constructVal AnyT v = return v
 constructVal t v = if t /= (getType v)
