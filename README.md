@@ -30,6 +30,8 @@
     - Could be alleviated with defunctionalization
 - [Gradual Typing for Functional Languages](./papers/13-siek.pdf)
   - Gradual type system for lambda calculus
+- [Relational Type Theory](./papers/2101.09655.pdf)
+  - Types are described as relations between terms; can do induction without dependent types
 - [Automatic SIMD Vectorization for Haskell](./papers/vectorization-haskell.pdf)
   - Automatic SIMD vectorization of immutable arrays
 - [A modern look at GRIN, an optimizing functional language back end](./papers/main.pdf)
