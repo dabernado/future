@@ -171,9 +171,9 @@ primTypes = [ (":Symbol", Type SymbolT)
                                              , returnType = DottedListT AnyT AnyT
                                              })
             , (":Vector", Type TypeConst { args = 1, returnType = VectorT AnyT })
-            , (":Function", Type TypeConst { args = 2
-                                           , returnType = FuncT { paramsType = List AnyT []
-                                                                , result = Just AnyT
-                                                                }
-                                           })
+            , (":Func", Type TypeConst { args = 2
+                                       , returnType = FuncT { paramsType = List AnyT []
+                                                            , result = Nothing
+                                                            }
+                                       })
             ]

@@ -58,7 +58,9 @@ eval env (List _ (Atom "fn" : varargs@(Atom _) : body)) =
 eval env (List _ (func : args)) = do
   f <- eval env func
   argVals <- mapM (eval env) args
-  apply f argVals
+  case f of
+    Type t@(TypeConst 2 (FuncT _ _)) -> constructFunc env t argVals
+    _ -> apply f argVals
 eval env badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
 makeFunc varargs env params body = do
@@ -103,7 +105,6 @@ evalQQ env (List _ [Atom "unquote", val]) = eval env val
 --evalQQ (List _ [Atom "unquote-splicing", List _ val]) = eval val
 evalQQ env val@(List _ _) = return val
 
--- TODO: add clause for function type constructors
 apply :: FutureVal -> [FutureVal] -> IOResult FutureVal
 apply (Primitive func) args = liftResult $ func args
 apply (Type (TypeConst argNum rt)) (Type t : args) = case t of
@@ -148,7 +149,7 @@ zipTypes ((var,t):params) (val:args) = case t of
                           return $ (var,val):xs
                         else throwError $ TypeError t (getType val)
 
--- TODO: add clauses for custom types and functions
+-- TODO: add clauses for custom types
 constructVal :: FutureType -> FutureVal -> IOResult FutureVal
 constructVal (ListT t) (List _ v) = do
   vals <- mapM (constructVal t) v
@@ -161,14 +162,53 @@ constructVal (VectorT t) (Vector _ v) = do
   vals <- mapM (constructVal t) v
   return $ Vector t vals
 constructVal (TypeConst _ t) v = constructVal t v
+-- TODO: Evaluate return type via function body
+constructVal t@(FuncT (List TypeT args) _rt) func@(Function params Nothing b c) =
+  if length args /= length params
+     then throwError $ TypeError t (getType func)
+     else do
+       newParams <- checkParams args params
+       return $ Function newParams Nothing b c
+constructVal t@(FuncT (DottedList (TypeT, TypeT) args vt) rt) func@(Function params (Just vararg) b c) =
+  if length args /= length params
+     then throwError $ TypeError t (getType func)
+     else do
+       newParams <- checkParams args params
+       return $ Function newParams (Just vararg) b c
 constructVal AnyT v = return v
 constructVal t v = if t /= (getType v)
                       then throwError $ TypeError t (getType v)
                       else return $ v
+
+checkParams :: [FutureVal] -> [(String, FutureType)] -> IOResult [(String, FutureType)]
+checkParams [] [] = return []
+checkParams (Type AnyT : xs) ((n, _) : ys) = do
+  rest <- checkParams xs ys
+  return $ (n, AnyT) : rest
+checkParams (Type t : xs) ((n, AnyT) : ys) = do
+  rest <- checkParams xs ys
+  return $ (n, t) : rest
+checkParams (Type t1 : xs) ((n, t2) : ys) = if t1 /= t2
+  then throwError $ TypeError t1 t2
+  else do
+    rest <- checkParams xs ys
+    return $ (n, t1) : rest
 
 -- TODO: add clause for custom types
 constructType :: Int -> FutureType -> FutureType -> FutureVal
 constructType 1 (ListT _) t = Type (ListT t)
 constructType 1 (VectorT _) t = Type (VectorT t)
 constructType 1 (DottedListT t1 _) t2 = Type (DottedListT t1 t2)
+constructType 1 (FuncT p _) t = Type (FuncT p (Just t))
 constructType 2 (DottedListT _ _) t = Type (TypeConst 1 (DottedListT t AnyT))
+
+constructFunc :: Env -> FutureType -> [FutureVal] -> IOResult FutureVal
+constructFunc env (TypeConst 2 (FuncT _ _)) (List _ params : args) = do
+  evaled <- mapM (eval env) params
+  types <- mapM (constructVal TypeT) evaled
+  apply (Type (TypeConst 1 (FuncT (List TypeT types) Nothing))) args
+constructFunc env (TypeConst 2 (FuncT _ _)) (DottedList _ params vararg : args) = do
+  evaled <- mapM (eval env) params
+  types <- mapM (constructVal TypeT) evaled
+  vt <- constructVal TypeT vararg
+  apply (Type (TypeConst 1 (FuncT (DottedList (TypeT, TypeT) types vt) Nothing))) args

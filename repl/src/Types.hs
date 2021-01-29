@@ -224,7 +224,7 @@ instance Show FutureType where
   show (IntegerT) = ":Int"
   show (FloatT) = ":Float"
   show (RatioT) = ":Ratio"
-  show (AnyT) = ":Any"
+  show (AnyT) = ":?"
   show (TypeT) = ":Type"
   show (ListT t) = "(:List " ++ show t ++ ")"
   show (DottedListT a b) = "(:DottedList " ++ show a ++ " " ++ show b ++ ")"
