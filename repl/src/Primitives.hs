@@ -166,14 +166,14 @@ primTypes = [ (":Symbol", Type SymbolT)
             , (":Ratio", Type RatioT)
             , (":?", Type AnyT)
             , (":Type", Type TypeT)
-            , (":List", Type TypeConst { args = 1, returnType = ListT AnyT })
-            , (":DottedList", Type TypeConst { args = 2
-                                             , returnType = DottedListT AnyT AnyT
-                                             })
-            , (":Vector", Type TypeConst { args = 1, returnType = VectorT AnyT })
-            , (":Func", Type TypeConst { args = 2
-                                       , returnType = FuncT { paramsType = List AnyT []
-                                                            , result = Nothing
-                                                            }
-                                       })
+            , (":List", Type PartialT { args = 1, returnType = ListT AnyT })
+            , (":DottedList", Type PartialT { args = 2
+                                            , returnType = DottedListT AnyT AnyT
+                                            })
+            , (":Vector", Type PartialT { args = 1, returnType = VectorT AnyT })
+            , (":Func", Type PartialT { args = 2
+                                      , returnType = FuncT { paramsType = List AnyT []
+                                                           , result = Nothing
+                                                           }
+                                      })
             ]
