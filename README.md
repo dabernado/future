@@ -42,6 +42,9 @@
   - Summary of GRIN IR and its current implementations
 
 ## Resources
-- [Write You A Scheme in 48 Hours](https://en.wikibooks.org/wiki/Write_Yourself_a_Scheme_in_48_Hours)
-- [Writing A Lisp Interpreter In Haskell](https://www.defmacro.org/ramblings/lisp-in-haskell.html)
+- [Write Yourself A Scheme in 48 Hours](https://en.wikibooks.org/wiki/Write_Yourself_a_Scheme_in_48_Hours)
+  - Main resource for building the first version of the interpreter
 - [Write You a Haskell](http://dev.stephendiehl.com/fun/index.html)
+  - Includes useful information about building functional language compilers
+- [Souper: Superoptimizer for LLVM IR](https://github.com/google/souper)
+  - Useful for implementing new optimizations in the GRIN compiler
