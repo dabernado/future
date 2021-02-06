@@ -76,8 +76,10 @@ makeVarArgs = makeFunc . Just . showVal
 makeType env name typeargs consts = do
   defineConsts env newType (map showVal typeargs) consts
   return $ Type newType
-  where newType = PartialT (length typeargs) (CustomT name dynList)
-        dynList = replicate (length typeargs) AnyT
+    where dynList = replicate (length typeargs) AnyT
+          newType = if typeargs /= []
+                       then PartialT (length typeargs) (CustomT name dynList)
+                       else CustomT name dynList
 
 expandParams :: Env -> [FutureVal] -> IOResult [(String, FutureType)]
 expandParams env (Atom const@(':':_) : Atom id : params) = do
@@ -130,14 +132,13 @@ defineConsts env newType targs consts = do
             Type argType <- getVar env x
             checkArgs xs >>= (return . (:) (argType, -1))
         buildConst i c [] =
-          TypeConst { input = []
-                    , output = newType
-                    , enum = (i, c)
-                    , typeIndices = []
-                    }
+          Custom { valType = unwrap newType
+                 , variant = (i, c)
+                 , inner = []
+                 }
         buildConst i c args =
           TypeConst { input = [t | (t,_) <- args]
-                    , output = newType
+                    , output = unwrap newType
                     , enum = (i, c)
                     , typeIndices = [n | (_,n) <- args]
                     }
@@ -145,22 +146,28 @@ defineConsts env newType targs consts = do
 apply :: FutureVal -> [FutureVal] -> IOResult FutureVal
 apply (Primitive func) args = liftResult $ func args
 apply (Type (PartialT argNum rt)) (Type t : args) = case t of
-      PartialT _ def -> apply (constructType argNum rt def) args
-      _              -> apply (constructType argNum rt t) args
+  PartialT _ def -> apply (constructType argNum rt def) args
+  _              -> apply (constructType argNum rt t) args
 apply (Type t) [] = return $ Type t
 apply (Type t) [arg] = constructVal t arg
 apply (Type t) args = throwError $ NumArgs 1 args
+apply (TypeConst inputTypes out enum indices) args = do
+  constChecked <- checkTypeList inputTypes args
+  typeChecked <- checkTypeList (indexTypes indices $ typesList out) constChecked
+  return $ Custom out enum (zip typeChecked indices)
+    where typesList (CustomT _ ts) = ts
+          typesList (PartialT _ (CustomT _ ts)) = ts
 apply (Function params varargs body env) args =
-      if length params /= length args && varargs == Nothing
-         then throwError $ NumArgs (length params) args
-         else do
-           argVals <- zipTypes params args
-           (liftIO $ bindVars env argVals) >>= bindVarArgs varargs >>= evalBody
-      where remainingArgs = drop (length params) args
-            evalBody env = liftM last $ mapM (eval env) body
-            bindVarArgs arg env = case arg of
-                Just argName -> liftIO $ bindVars env [(argName, List AnyT $ remainingArgs)]
-                Nothing      -> return env
+  if length params /= length args && varargs == Nothing
+     then throwError $ NumArgs (length params) args
+     else do
+       argVals <- zipTypes params args
+       (liftIO $ bindVars env argVals) >>= bindVarArgs varargs >>= evalBody
+  where remainingArgs = drop (length params) args
+        evalBody env = liftM last $ mapM (eval env) body
+        bindVarArgs arg env = case arg of
+            Just argName -> liftIO $ bindVars env [(argName, List AnyT $ remainingArgs)]
+            Nothing      -> return env
 
 zipTypes :: [(String, FutureType)] -> [FutureVal] -> IOResult [(String, FutureVal)]
 zipTypes [] [] = return []
@@ -186,7 +193,6 @@ zipTypes ((var,t):params) (val:args) = case t of
                          return $ (var,val):xs
                        else throwError $ TypeError t (getType val)
 
--- TODO: add clauses for custom types
 constructVal :: FutureType -> FutureVal -> IOResult FutureVal
 constructVal (ListT t) (List _ v) = do
   vals <- mapM (constructVal t) v
@@ -199,6 +205,11 @@ constructVal (VectorT t) (Vector _ v) = do
   vals <- mapM (constructVal t) v
   return $ Vector t vals
 constructVal (PartialT _ t) v = constructVal t v
+constructVal t@(CustomT n1 ts) v@(Custom vt variant vs) = if checkType t v
+  then do
+    _ <- checkTypeList (indexTypes [i | (_,i) <- vs] ts) [v | (v,_) <- vs]
+    return $ Custom t variant vs
+  else throwError $ TypeError t vt
 -- TODO: Evaluate return type via function body
 constructVal t@(FuncT (List TypeT args) _rt) func@(Function params Nothing b c) =
   if length args /= length params
@@ -213,9 +224,9 @@ constructVal t@(FuncT (DottedList (TypeT, TypeT) args vt) rt) func@(Function par
        newParams <- checkParams args params
        return $ Function newParams (Just vararg) b c
 constructVal AnyT v = return v
-constructVal t v = if t /= (getType v)
-                      then throwError $ TypeError t (getType v)
-                      else return $ v
+constructVal t v = if checkType t v
+                      then return v
+                      else throwError $ TypeError t (getType v)
 
 checkParams :: [FutureVal] -> [(String, FutureType)] -> IOResult [(String, FutureType)]
 checkParams [] [] = return []

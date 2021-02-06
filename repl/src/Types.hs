@@ -50,7 +50,7 @@ data FutureVal = Atom String
                | DottedList (FutureType, FutureType) [FutureVal] FutureVal
                | Custom { valType :: FutureType
                         , variant :: (Int, String)
-                        , inner :: [FutureVal]
+                        , inner :: [(FutureVal, Int)]
                         }
                | Primitive ([FutureVal] -> Result FutureVal)
                | TypeConst { input :: [FutureType]
@@ -107,7 +107,7 @@ showVal v@(Bool False) = "false"
 showVal v@(Integer n) = show n
 showVal v@(Float f) = show f
 showVal v@(Ratio r) = show (numerator r) ++ "/" ++ show (denominator r)
-showVal v@(Custom _ (_,con) xs) = con ++ unwordsList xs
+showVal v@(Custom _ (_,con) xs) = con ++ " " ++ unwords (map showVal [v | (v,_) <- xs])
 showVal v@(List _ xs) = "(" ++ unwordsList xs ++ ")"
 showVal v@(DottedList _ x xs) = "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
 showVal val@(Vector _ v) = "(" ++ (unwordsList . Vector.toList) v ++ ")"
@@ -226,7 +226,8 @@ instance Show FutureType where
   show (RatioT) = ":Ratio"
   show (AnyT) = ":?"
   show (TypeT) = ":Type"
-  show (CustomT n ts) = n ++ " " ++ unwords (map show ts)
+  show (CustomT n []) = n
+  show (CustomT n ts) = "(" ++ n ++ " " ++ unwords (map show ts) ++ ")"
   show (ListT t) = "(:List " ++ show t ++ ")"
   show (DottedListT a b) = "(:DottedList " ++ show a ++ " " ++ show b ++ ")"
   show (VectorT t) = "(:Vector " ++ show t ++ ")"
@@ -238,9 +239,32 @@ instance Show FutureType where
                                                  ") " ++ show return ++ ")"
   show (PartialT _ t) = show t
 
+unwrap :: FutureType -> FutureType
+unwrap (PartialT _ t) = t
+unwrap t = t
+
+checkTypes :: FutureType -> FutureType -> Bool
+checkTypes AnyT _ = True
+checkTypes _ AnyT = True
+checkTypes (CustomT n1 ts1) (CustomT n2 ts2) = (n1 == n2) && checkTypesMap ts1 ts2
+    where checkTypesMap [] [] = True
+          checkTypesMap (t1:l1) (t2:l2) = checkTypes t1 t2 && checkTypesMap l1 l2
+checkTypes t1 t2 = unwrap t1 == unwrap t2
+
 checkType :: FutureType -> FutureVal -> Bool
-checkType AnyT _ = True
-checkType t v = t == getType v
+checkType t v = checkTypes t (getType v)
+
+checkTypeList :: [FutureType] -> [FutureVal] -> IOResult [FutureVal]
+checkTypeList [] [] = return []
+checkTypeList (t:ts) (v:vs) =
+  if checkType t v
+     then checkTypeList ts vs >>= (return . (:) v)
+     else throwError $ TypeError t (getType v)
+
+indexTypes :: [Int] -> [FutureType] -> [FutureType]
+indexTypes [] _ = []
+indexTypes (-1:is) ts = AnyT : indexTypes is ts
+indexTypes (i:is) ts = (ts !! i) : indexTypes is ts
 
 data FutureError = NumArgs Int [FutureVal]
                  | TypeError FutureType FutureType
