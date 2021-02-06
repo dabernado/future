@@ -207,6 +207,7 @@ constructVal (VectorT t) (Vector _ v) = do
   vals <- mapM (constructVal t) v
   return $ Vector t vals
 constructVal (PartialT _ t) v = constructVal t v
+-- TODO: Implement recursive type checking
 constructVal t@(CustomT n1 ts) v@(Custom vt variant vs) = if checkType t v
   then do
     _ <- checkTypeList (indexTypes [i | (_,i) <- vs] ts) [v | (v,_) <- vs]
