@@ -30,12 +30,21 @@
     - Could be alleviated with defunctionalization
 - [Gradual Typing for Functional Languages](./papers/13-siek.pdf)
   - Gradual type system for lambda calculus
+- [Putting Gradual Types to Work](./papers/2101.12299.pdf)
+  - Examples of what is possible with gradual typing
+- [Gradual Types with Unification-based Inference](./papers/dls08igtlc.pdf)
+  - Novel, efficient and reliable method of type inference for a gradual type system
+- [Relational Type Theory](./papers/2101.09655.pdf)
+  - Types are described as relations between terms; can do induction without dependent types
 - [Automatic SIMD Vectorization for Haskell](./papers/vectorization-haskell.pdf)
   - Automatic SIMD vectorization of immutable arrays
 - [A modern look at GRIN, an optimizing functional language back end](./papers/main.pdf)
   - Summary of GRIN IR and its current implementations
 
 ## Resources
-- [Write You A Scheme in 48 Hours](https://en.wikibooks.org/wiki/Write_Yourself_a_Scheme_in_48_Hours)
-- [Writing A Lisp Interpreter In Haskell](https://www.defmacro.org/ramblings/lisp-in-haskell.html)
+- [Write Yourself A Scheme in 48 Hours](https://en.wikibooks.org/wiki/Write_Yourself_a_Scheme_in_48_Hours)
+  - Main resource for building the first version of the interpreter
 - [Write You a Haskell](http://dev.stephendiehl.com/fun/index.html)
+  - Includes useful information about building functional language compilers
+- [Souper: Superoptimizer for LLVM IR](https://github.com/google/souper)
+  - Useful for implementing new optimizations in the GRIN compiler
