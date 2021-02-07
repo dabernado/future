@@ -118,7 +118,7 @@ showVal v@(Function { params = args
                    , vararg = varargs
                    , body = _
                    , closure = env
-                   }) = " (fn (" ++ unwords (map show args) ++
+                   }) = " (fn (" ++ unwords [n | (n,_) <- args] ++
                         (case varargs of
                            Nothing -> ""
                            Just arg -> " . " ++ arg) ++ ") ...)"
@@ -231,13 +231,19 @@ instance Show FutureType where
   show (ListT t) = "(:List " ++ show t ++ ")"
   show (DottedListT a b) = "(:DottedList " ++ show a ++ " " ++ show b ++ ")"
   show (VectorT t) = "(:Vector " ++ show t ++ ")"
-  show (PrimitiveFuncT) = "(:Func <primitive>)"
-  show (FuncT (List _ args) return) = "(:Func (" ++ unwords (map show args) ++
-                                      ") " ++ show return ++ ")"
-  show (FuncT (DottedList _ args vararg) return) = "(:Func (" ++ unwords (map show args)
-                                                 ++ " . " ++ show vararg ++
-                                                 ") " ++ show return ++ ")"
   show (PartialT _ t) = show t
+  show (PrimitiveFuncT) = "(:Func <primitive>)"
+  show (FuncT (List _ args) Nothing) = "(:Func (" ++ unwords (map showVal args) ++ "))"
+  show (FuncT (List _ args) (Just return)) =
+    "(:Func (" ++ unwords (map showVal args) ++
+    ") " ++ show return ++ ")"
+  show (FuncT (DottedList _ args vararg) Nothing) =
+    "(:Func (" ++ unwords (map showVal args)
+    ++ " . " ++ show vararg ++ "))"
+  show (FuncT (DottedList _ args vararg) (Just return)) =
+    "(:Func (" ++ unwords (map showVal args)
+    ++ " . " ++ show vararg ++
+    ") " ++ show return ++ ")"
 
 unwrap :: FutureType -> FutureType
 unwrap (PartialT _ t) = t
