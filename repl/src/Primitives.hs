@@ -21,6 +21,7 @@ primOps = [ ("+", numBinop (+))
           , ("&&", boolBinop andF)
           , ("||", boolBinop orF)
           , ("++", strBinop concatF)
+          , ("type", getTypePrim)
           , ("car", car)
           , ("cdr", cdr)
           , ("cons", cons)
@@ -46,6 +47,10 @@ primOps = [ ("+", numBinop (+))
     andF (Bool a) (Bool b) = Bool $ a && b
     orF (Bool a) (Bool b) = Bool $ a || b
     concatF (String a) (String b) = String $ a ++ b
+
+getTypePrim :: [FutureVal] -> Result FutureVal
+getTypePrim [v] = return $ Type (getType v)
+getTypePrim n = throwError $ NumArgs 1 n
 
 car :: [FutureVal] -> Result FutureVal
 car [List _ (x:xs)] = return x
@@ -74,19 +79,16 @@ cons [x, y] = return $ DottedList (AnyT, AnyT) [x] y
 cons args = throwError $ NumArgs 2 args
 
 isSymbol :: [FutureVal] -> Result FutureVal
-isSymbol [] = throwError $ NumArgs 1 []
 isSymbol [Atom _] = return $ Bool True
 isSymbol [_] = return $ Bool False
 isSymbol n = throwError $ NumArgs 1 n
 
 symToString :: [FutureVal] -> Result FutureVal
-symToString [] = throwError $ NumArgs 1 []
 symToString [Atom a] = return $ String a
 symToString [t] = throwError $ TypeError SymbolT (getType t)
 symToString n = throwError $ NumArgs 1 n
 
 strToSymbol :: [FutureVal] -> Result FutureVal
-strToSymbol [] = throwError $ NumArgs 1 []
 strToSymbol [String s] = return $ Atom s
 strToSymbol [t] = throwError $ TypeError StringT (getType t)
 strToSymbol n = throwError $ NumArgs 1 n
@@ -103,13 +105,11 @@ makeString cs = case charTypeCheck cs of
     charTypeCheck (x:xs) = throwError $ TypeError CharT (getType x)
 
 strLength :: [FutureVal] -> Result FutureVal
-strLength [] = throwError $ NumArgs 1 []
 strLength [String s] = return $ Integer (length s)
 strLength [t] = throwError $ TypeError StringT (getType t)
 strLength n = throwError $ NumArgs 1 n
 
 indexString :: [FutureVal] -> Result FutureVal
-indexString [] = throwError $ NumArgs 1 []
 indexString [Integer n, String s] = return $ Char (s !! n)
 indexString [Integer _, b] = throwError $ TypeError IntegerT (getType b)
 indexString [a, _] = throwError $ TypeError IntegerT (getType a)
