@@ -2,18 +2,91 @@
 
 **Warning:** this project is in its EXTREMELY early stages. It doesn't even have a working interpreter yet. This repository exists mostly just as a place to store my ideas, code and research.
 
-## Features
-- Functional programming
-  - Pure functions & immutable data
-  - Optional lazy evaluation
-- Gradually typed, w/ first-class types
-- Supports transactional, atomic live upgrade of code and data within a running program
+Future is a gradually typed Scheme variant, with Clojure-inspired syntax, immutability and support for first-class types.
+
+## Examples
+
+Future is built on a subset of primitive Scheme data types and operations
+
+```
+x           ; :Symbol
+4           ; :Int
+1.50        ; :Float
+22/7        ; :Ration
+"hello"     ; :String
+\c          ; :Char
+true        ; :Bool
+'(1 2 3)    ; :List
+[1 2 3]     ; :Vector
+{:a 1 :b 2} ; :Map
+(1 . 2)     ; :Pair
+#(+ %1 %2)  ; :Func
+```
+
+Functions are dynamically typed when written without type declarations...
+
+```
+(defn greet (name)
+    (++ "Hello " name "!"))
+
+>>> (:Func (:?) :?) (fn (name) ...)
+```
+
+...but statically typed when written with them.
+
+```
+(defn add (:Int x :Int y) :Int
+    (+ x y))
+
+>>> (:Func (:Int :Int) :Int) (fn (x y) ...)
+```
+
+Values can be partially or fully typed
+
+```
+(:List '(1 2 3))
+>>> (:List :?) (:Int 1 :Int 2 :Int 3)
+
+((:List :Int) '(1 2 3))
+>>> (:List :Int) (:Int 1 :Int 2 :Int 3)
+
+((:List :Int) '(\a \b \c))
+>>> Type error - expected :Int, found :Char
+```
+
+In addition, Future also supports defining custom data types...
+
+```
+(deftype (:Maybe x)
+    (just x)
+    (nil))
+
+>>> :Type (:Maybe :?)
+```
+
+...as well as the ability to use types as first-class values.
+
+```
+(defn check-type (:Type t v)
+    (= t (type v)))
+
+>>> (:Func (:Type :?) :?) (fn (t v) ...)
+
+(check-type :Int 3)
+>>> :Bool true
+
+(check-type :Char 7)
+>>> :Bool false
+```
+
+## Planned Features
 - Whole-program optimizing compiler
   - Uses GRIN as IR
   - Aggressive inlining, defunctionalization and unboxing
   - Aggressive dead code elimination
   - ASAP memory management
   - SIMD vectorization of lists
+- Transactional, atomic live upgrade of code and data within a running program
 - Actor-style concurrency
 
 ## Papers
