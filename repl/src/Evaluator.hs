@@ -15,7 +15,6 @@ eval env val@(Integer _) = return val
 eval env val@(Float _) = return val
 eval env val@(Ratio _) = return val
 eval env (Atom id) = getVar env id
-eval env (List _ [val]) = return val
 eval env (List _ [Atom "quote", val]) = return val
 eval env (List _ [Atom "quasiquote", List _ val]) = mapM (evalQQ env) val >>= (return . List AnyT)
 eval env (List _ [Atom "quasiquote", val]) = return val
@@ -60,12 +59,13 @@ eval env (List _ (Atom "fn" : DottedList _ params varargs : body)) =
   makeVarArgs varargs env params body
 eval env (List _ (Atom "fn" : varargs@(Atom _) : body)) =
   makeVarArgs varargs env [] body
-eval env (List _ (func : args)) = do
+eval env (List _ (func@(Atom _) : args)) = do
   f <- eval env func
   argVals <- mapM (eval env) args
   case f of
     Type t@(PartialT 2 (FuncT _ _)) -> constructFunc env t argVals
     _ -> apply f argVals
+eval env (List _ [val]) = return val
 eval env badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
 makeFunc varargs env params body = do
