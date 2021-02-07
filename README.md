@@ -12,7 +12,7 @@ Future is built on a subset of primitive Scheme data types and operations
 x           ; :Symbol
 4           ; :Int
 1.50        ; :Float
-22/7        ; :Ration
+22/7        ; :Ratio
 "hello"     ; :String
 \c          ; :Char
 true        ; :Bool
