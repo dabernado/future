@@ -146,7 +146,6 @@ parseQuasiQuoted = do
                <|> parseMap
                <|> parseAnyQQList
                <|> parsePound
-               <|> parseComment
 
 parseChar :: Parser FutureVal
 parseChar = do
@@ -196,9 +195,8 @@ parseExpr = parseAtom
         <|> parseMap
         <|> parseAnyList
         <|> parsePound
-        <|> parseComment
 
 readExpr :: String -> Result FutureVal
-readExpr input = case parse parseExpr "future" input of
+readExpr input = case parse (parseExpr <|> parseComment) "future" input of
     Left err -> throwError $ Parser err
     Right val -> return val
