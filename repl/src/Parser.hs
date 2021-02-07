@@ -16,6 +16,11 @@ symbol = oneOf "*+!/:-_?=&<>|"
 spaces :: Parser ()
 spaces = skipMany (char ',') >> skipMany1 space
 
+parseComment :: Parser FutureVal
+parseComment = do
+  char ';'
+  return $ List AnyT []
+
 parseList :: Parser FutureVal
 parseList = liftM (List AnyT) $ sepBy parseExpr spaces
 
@@ -141,6 +146,7 @@ parseQuasiQuoted = do
                <|> parseMap
                <|> parseAnyQQList
                <|> parsePound
+               <|> parseComment
 
 parseChar :: Parser FutureVal
 parseChar = do
@@ -190,6 +196,7 @@ parseExpr = parseAtom
         <|> parseMap
         <|> parseAnyList
         <|> parsePound
+        <|> parseComment
 
 readExpr :: String -> Result FutureVal
 readExpr input = case parse parseExpr "future" input of
