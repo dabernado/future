@@ -167,7 +167,7 @@ primTypes = [ (":Symbol", Type SymbolT)
             , (":?", Type AnyT)
             , (":Type", Type TypeT)
             , (":List", Type PartialT { args = 1, returnType = ListT AnyT })
-            , (":DottedList", Type PartialT { args = 2
+            , (":Pair", Type PartialT { args = 2
                                             , returnType = DottedListT AnyT AnyT
                                             })
             , (":Vector", Type PartialT { args = 1, returnType = VectorT AnyT })
