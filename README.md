@@ -113,6 +113,8 @@ In addition, Future also supports defining custom data types...
   - Automatic SIMD vectorization of immutable arrays
 - [A modern look at GRIN, an optimizing functional language back end](./papers/main.pdf)
   - Summary of GRIN IR and its current implementations
+- [Composable Transactional Memory](./papers/2005-ppopp-composable.pdf)
+  - Details on implementing STM, useful for concurrency implementation
 
 ## Resources
 - [Write Yourself A Scheme in 48 Hours](https://en.wikibooks.org/wiki/Write_Yourself_a_Scheme_in_48_Hours)
