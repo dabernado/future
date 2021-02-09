@@ -1,6 +1,6 @@
 module Parser where
 
-import Types
+import Core.Types
 
 import Data.List (nub)
 import Data.Ratio ((%))

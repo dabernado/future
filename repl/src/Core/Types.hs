@@ -1,4 +1,4 @@
-module Types where
+module Core.Types where
 
 import Data.IORef
 import Data.Vector (Vector)
@@ -193,6 +193,42 @@ instance Integral FutureVal where
 unwordsList :: [FutureVal] -> String
 unwordsList = unwords . map show
 
+-- Errors
+data FutureError = NumArgs Int [FutureVal]
+                 | TypeError FutureType FutureType
+                 | Parser ParseError
+                 | BadSpecialForm String FutureVal
+                 | NotFunction String String
+                 | UnboundVar String String
+                 | Immutable String String
+                 | Default String
+
+type Result = Either FutureError
+type IOResult = ExceptT FutureError IO
+
+liftResult :: Result a -> IOResult a
+liftResult (Left err) = throwError err
+liftResult (Right val) = return val
+
+runIOResult :: IOResult String -> IO String
+runIOResult action = runExceptT (trapError action) >>= return . extractValue
+
+instance Show FutureError where
+  show (UnboundVar msg var) = msg ++ " - " ++ var
+  show (Immutable msg var) = msg ++ " - " ++ var
+  show (BadSpecialForm msg form) = msg ++ " - " ++ show form
+  show (NotFunction msg func) = msg ++ " - " ++ func
+  show (NumArgs exp found) = "Expected " ++ show exp ++
+                             " args; found " ++ unwordsList found
+  show (TypeError exp found) = "Type error - expected " ++ show exp ++
+                               ", found " ++ show found
+  show (Parser err) = "Parse error at " ++ show err
+
+trapError action = catchError action (return . show)
+
+extractValue :: Result a -> a
+extractValue (Right val) = val
+
 -- TODO: Add type for maps
 data FutureType = SymbolT
                 | BoolT
@@ -271,38 +307,3 @@ indexTypes :: [Int] -> [FutureType] -> [FutureType]
 indexTypes [] _ = []
 indexTypes (-1:is) ts = AnyT : indexTypes is ts
 indexTypes (i:is) ts = (ts !! i) : indexTypes is ts
-
-data FutureError = NumArgs Int [FutureVal]
-                 | TypeError FutureType FutureType
-                 | Parser ParseError
-                 | BadSpecialForm String FutureVal
-                 | NotFunction String String
-                 | UnboundVar String String
-                 | Immutable String String
-                 | Default String
-
-type Result = Either FutureError
-type IOResult = ExceptT FutureError IO
-
-liftResult :: Result a -> IOResult a
-liftResult (Left err) = throwError err
-liftResult (Right val) = return val
-
-runIOResult :: IOResult String -> IO String
-runIOResult action = runExceptT (trapError action) >>= return . extractValue
-
-instance Show FutureError where
-  show (UnboundVar msg var) = msg ++ " - " ++ var
-  show (Immutable msg var) = msg ++ " - " ++ var
-  show (BadSpecialForm msg form) = msg ++ " - " ++ show form
-  show (NotFunction msg func) = msg ++ " - " ++ func
-  show (NumArgs exp found) = "Expected " ++ show exp ++
-                             " args; found " ++ unwordsList found
-  show (TypeError exp found) = "Type error - expected " ++ show exp ++
-                               ", found " ++ show found
-  show (Parser err) = "Parse error at " ++ show err
-
-trapError action = catchError action (return . show)
-
-extractValue :: Result a -> a
-extractValue (Right val) = val

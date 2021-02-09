@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d12a1a19af0a98e09b4ba2dce62a47db36bb08171e2b676c6c3cf3aa0ba2eb6a
+-- hash: 1637ba5f80d94559fccdb537c7e92d95c297e5eb8a609a8455071e57c89d976c
 
 name:           repl
 version:        0.1.0.0
@@ -27,10 +27,10 @@ source-repository head
 
 library
   exposed-modules:
+      Core.Primitives
+      Core.Types
       Evaluator
       Parser
-      Primitives
-      Types
   other-modules:
       Paths_repl
   hs-source-dirs:

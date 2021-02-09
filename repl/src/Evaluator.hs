@@ -1,6 +1,6 @@
 module Evaluator where
 
-import Types
+import Core.Types
 
 import Control.Monad.Except
 import Data.List (elemIndex)

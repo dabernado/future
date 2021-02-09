@@ -1,6 +1,6 @@
-module Primitives where
+module Core.Primitives where
 
-import Types
+import Core.Types
 
 import Control.Monad.Except
 
