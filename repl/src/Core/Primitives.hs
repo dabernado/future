@@ -66,13 +66,13 @@ cdr [arg] = throwError $ TypeError (ListT AnyT) (getType arg)
 cdr args = throwError $ NumArgs 1 args
 
 cons :: [FutureVal] -> Result FutureVal
-cons [x, List t []] = if checkType t x
+cons [x, List t []] = if checkType x t
                          then return $ List t [x]
                          else throwError $ TypeError t (getType x)
-cons [x, List t xs] = if checkType t x
+cons [x, List t xs] = if checkType x t
                          then return $ List t (x:xs)
                          else throwError $ TypeError t (getType x)
-cons [x, DottedList t@(t1,_) xs xlast] = if checkType t1 x
+cons [x, DottedList t@(t1,_) xs xlast] = if checkType x t1
                                             then return $ DottedList t (x:xs) xlast
                                             else throwError $ TypeError t1 (getType x)
 cons [x, y] = return $ DottedList (AnyT, AnyT) [x] y

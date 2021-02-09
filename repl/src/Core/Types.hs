@@ -250,7 +250,25 @@ data FutureType = SymbolT
                 | PartialT { args :: Int
                            , returnType :: FutureType
                            }
-                deriving (Eq)
+
+instance Eq FutureType where
+  (==) CharT CharT = True
+  (==) BoolT BoolT = True
+  (==) IntegerT IntegerT = True
+  (==) FloatT FloatT = True
+  (==) RatioT RatioT = True
+  (==) TypeT TypeT = True
+  (==) PrimitiveFuncT PrimitiveFuncT = True
+  (==) (ListT a) (ListT b) = a == b
+  (==) (VectorT a) (VectorT b) = a == b
+  (==) (DottedListT a1 a2) (DottedListT b1 b2) = (a1 == b1) && (a2 == b2)
+  (==) (CustomT an as) (CustomT bn bs) = (an == bn) && (as == bs)
+  (==) (FuncT p1 r1) (FuncT p2 r2) = (p1 == p2) && (r1 == r2)
+  (==) (PartialT _ a) (PartialT _ b) = a == b
+  (==) (PartialT _ a) b = a == b
+  (==) AnyT _ = True
+  (==) _ AnyT = True
+  (==) _ _ = False
 
 instance Show FutureType where
   show (SymbolT) = ":Symbol"
@@ -285,21 +303,13 @@ unwrap :: FutureType -> FutureType
 unwrap (PartialT _ t) = t
 unwrap t = t
 
-checkTypes :: FutureType -> FutureType -> Bool
-checkTypes AnyT _ = True
-checkTypes _ AnyT = True
-checkTypes (CustomT n1 ts1) (CustomT n2 ts2) = (n1 == n2) && checkTypesMap ts1 ts2
-    where checkTypesMap [] [] = True
-          checkTypesMap (t1:l1) (t2:l2) = checkTypes t1 t2 && checkTypesMap l1 l2
-checkTypes t1 t2 = unwrap t1 == unwrap t2
-
-checkType :: FutureType -> FutureVal -> Bool
-checkType t v = checkTypes t (getType v)
+checkType :: FutureVal -> FutureType -> Bool
+checkType = (==) . getType
 
 checkTypeList :: [FutureType] -> [FutureVal] -> IOResult [FutureVal]
 checkTypeList [] [] = return []
 checkTypeList (t:ts) (v:vs) =
-  if checkType t v
+  if checkType v t
      then checkTypeList ts vs >>= (return . (:) v)
      else throwError $ TypeError t (getType v)
 
