@@ -2,8 +2,8 @@ module Main where
 
 import Parser (readExpr)
 import Evaluator (eval)
-import Primitives (primOps, primTypes)
-import Types (
+import Core.Primitives (primOps, primTypes)
+import Core.Types (
     Env
   , FutureVal(..)
   , bindVars

@@ -1,6 +1,6 @@
 module Evaluator where
 
-import Types
+import Core.Types
 
 import Control.Monad.Except
 import Data.List (elemIndex)
@@ -209,7 +209,7 @@ constructVal (VectorT t) (Vector _ v) = do
   return $ Vector t vals
 constructVal (PartialT _ t) v = constructVal t v
 -- TODO: Implement recursive type checking
-constructVal t@(CustomT n1 ts) v@(Custom vt variant vs) = if checkType t v
+constructVal t@(CustomT n1 ts) v@(Custom vt variant vs) = if checkType v t
   then do
     _ <- checkTypeList (indexTypes [i | (_,i) <- vs] ts) [v | (v,_) <- vs]
     return $ Custom t variant vs
@@ -228,7 +228,7 @@ constructVal t@(FuncT (DottedList (TypeT, TypeT) args vt) rt) func@(Function par
        newParams <- checkParams args params
        return $ Function newParams (Just vararg) b c
 constructVal AnyT v = return v
-constructVal t v = if checkType t v
+constructVal t v = if checkType v t
                       then return v
                       else throwError $ TypeError t (getType v)
 

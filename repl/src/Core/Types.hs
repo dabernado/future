@@ -1,4 +1,4 @@
-module Types where
+module Core.Types where
 
 import Data.IORef
 import Data.Vector (Vector)
@@ -193,85 +193,7 @@ instance Integral FutureVal where
 unwordsList :: [FutureVal] -> String
 unwordsList = unwords . map show
 
--- TODO: Add type for maps
-data FutureType = SymbolT
-                | BoolT
-                | CharT
-                | StringT
-                | IntegerT
-                | FloatT
-                | RatioT
-                | ListT FutureType
-                | DottedListT FutureType FutureType
-                | VectorT FutureType
-                | CustomT String [FutureType]
-                | AnyT
-                | TypeT
-                | PrimitiveFuncT
-                | FuncT { paramsType :: FutureVal
-                        , result :: Maybe FutureType
-                        }
-                | PartialT { args :: Int
-                           , returnType :: FutureType
-                           }
-                deriving (Eq)
-
-instance Show FutureType where
-  show (SymbolT) = ":Symbol"
-  show (StringT) = ":String"
-  show (CharT) = ":Char"
-  show (BoolT) = ":Bool"
-  show (IntegerT) = ":Int"
-  show (FloatT) = ":Float"
-  show (RatioT) = ":Ratio"
-  show (AnyT) = ":?"
-  show (TypeT) = ":Type"
-  show (CustomT n []) = n
-  show (CustomT n ts) = "(" ++ n ++ " " ++ unwords (map show ts) ++ ")"
-  show (ListT t) = "(:List " ++ show t ++ ")"
-  show (DottedListT a b) = "(:DottedList " ++ show a ++ " " ++ show b ++ ")"
-  show (VectorT t) = "(:Vector " ++ show t ++ ")"
-  show (PartialT _ t) = show t
-  show (PrimitiveFuncT) = "(:Func <primitive>)"
-  show (FuncT (List _ args) Nothing) = "(:Func (" ++ unwords (map showVal args) ++ "))"
-  show (FuncT (List _ args) (Just return)) =
-    "(:Func (" ++ unwords (map showVal args) ++
-    ") " ++ show return ++ ")"
-  show (FuncT (DottedList _ args vararg) Nothing) =
-    "(:Func (" ++ unwords (map showVal args)
-    ++ " . " ++ show vararg ++ "))"
-  show (FuncT (DottedList _ args vararg) (Just return)) =
-    "(:Func (" ++ unwords (map showVal args)
-    ++ " . " ++ show vararg ++
-    ") " ++ show return ++ ")"
-
-unwrap :: FutureType -> FutureType
-unwrap (PartialT _ t) = t
-unwrap t = t
-
-checkTypes :: FutureType -> FutureType -> Bool
-checkTypes AnyT _ = True
-checkTypes _ AnyT = True
-checkTypes (CustomT n1 ts1) (CustomT n2 ts2) = (n1 == n2) && checkTypesMap ts1 ts2
-    where checkTypesMap [] [] = True
-          checkTypesMap (t1:l1) (t2:l2) = checkTypes t1 t2 && checkTypesMap l1 l2
-checkTypes t1 t2 = unwrap t1 == unwrap t2
-
-checkType :: FutureType -> FutureVal -> Bool
-checkType t v = checkTypes t (getType v)
-
-checkTypeList :: [FutureType] -> [FutureVal] -> IOResult [FutureVal]
-checkTypeList [] [] = return []
-checkTypeList (t:ts) (v:vs) =
-  if checkType t v
-     then checkTypeList ts vs >>= (return . (:) v)
-     else throwError $ TypeError t (getType v)
-
-indexTypes :: [Int] -> [FutureType] -> [FutureType]
-indexTypes [] _ = []
-indexTypes (-1:is) ts = AnyT : indexTypes is ts
-indexTypes (i:is) ts = (ts !! i) : indexTypes is ts
-
+-- Errors
 data FutureError = NumArgs Int [FutureVal]
                  | TypeError FutureType FutureType
                  | Parser ParseError
@@ -306,3 +228,92 @@ trapError action = catchError action (return . show)
 
 extractValue :: Result a -> a
 extractValue (Right val) = val
+
+-- TODO: Add type for maps
+data FutureType = SymbolT
+                | BoolT
+                | CharT
+                | StringT
+                | IntegerT
+                | FloatT
+                | RatioT
+                | ListT FutureType
+                | DottedListT FutureType FutureType
+                | VectorT FutureType
+                | CustomT String [FutureType]
+                | AnyT
+                | TypeT
+                | PrimitiveFuncT
+                | FuncT { paramsType :: FutureVal
+                        , result :: Maybe FutureType
+                        }
+                | PartialT { args :: Int
+                           , returnType :: FutureType
+                           }
+
+instance Eq FutureType where
+  (==) CharT CharT = True
+  (==) BoolT BoolT = True
+  (==) IntegerT IntegerT = True
+  (==) FloatT FloatT = True
+  (==) RatioT RatioT = True
+  (==) TypeT TypeT = True
+  (==) PrimitiveFuncT PrimitiveFuncT = True
+  (==) (ListT a) (ListT b) = a == b
+  (==) (VectorT a) (VectorT b) = a == b
+  (==) (DottedListT a1 a2) (DottedListT b1 b2) = (a1 == b1) && (a2 == b2)
+  (==) (CustomT an as) (CustomT bn bs) = (an == bn) && (as == bs)
+  (==) (FuncT p1 r1) (FuncT p2 r2) = (p1 == p2) && (r1 == r2)
+  (==) (PartialT _ a) (PartialT _ b) = a == b
+  (==) (PartialT _ a) b = a == b
+  (==) AnyT _ = True
+  (==) _ AnyT = True
+  (==) _ _ = False
+
+instance Show FutureType where
+  show (SymbolT) = ":Symbol"
+  show (StringT) = ":String"
+  show (CharT) = ":Char"
+  show (BoolT) = ":Bool"
+  show (IntegerT) = ":Int"
+  show (FloatT) = ":Float"
+  show (RatioT) = ":Ratio"
+  show (AnyT) = ":?"
+  show (TypeT) = ":Type"
+  show (CustomT n []) = n
+  show (CustomT n ts) = "(" ++ n ++ " " ++ unwords (map show ts) ++ ")"
+  show (ListT t) = "(:List " ++ show t ++ ")"
+  show (DottedListT a b) = "(:DottedList " ++ show a ++ " " ++ show b ++ ")"
+  show (VectorT t) = "(:Vector " ++ show t ++ ")"
+  show (PartialT _ t) = show t
+  show (PrimitiveFuncT) = "(:Func <primitive>)"
+  show (FuncT (List _ args) Nothing) = "(:Func (" ++ unwords (map showVal args) ++ "))"
+  show (FuncT (List _ args) (Just return)) =
+    "(:Func (" ++ unwords (map showVal args) ++
+    ") " ++ show return ++ ")"
+  show (FuncT (DottedList _ args vararg) Nothing) =
+    "(:Func (" ++ unwords (map showVal args)
+    ++ " . " ++ show vararg ++ "))"
+  show (FuncT (DottedList _ args vararg) (Just return)) =
+    "(:Func (" ++ unwords (map showVal args)
+    ++ " . " ++ show vararg ++
+    ") " ++ show return ++ ")"
+
+unwrap :: FutureType -> FutureType
+unwrap (PartialT _ t) = t
+unwrap t = t
+
+checkType :: FutureVal -> FutureType -> Bool
+checkType = (==) . getType
+
+checkTypeList :: [FutureType] -> [FutureVal] -> IOResult [FutureVal]
+checkTypeList [] [] = return []
+checkTypeList (t:ts) (v:vs) =
+  if checkType v t
+     then checkTypeList ts vs >>= (return . (:) v)
+     else throwError $ TypeError t (getType v)
+
+indexTypes :: [Int] -> [FutureType] -> [FutureType]
+indexTypes [] _ = []
+indexTypes (-1:is) ts = AnyT : indexTypes is ts
+indexTypes (i:is) ts = (ts !! i) : indexTypes is ts
