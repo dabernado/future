@@ -135,6 +135,10 @@ defineConsts env newType targs consts = do
               Type argType <- getVar env x
               checkArgs xs >>= (return . (:) (argType, -1))
             else checkArgs xs >>= (return . (:) (newType, -1))
+        checkArgs (List _ arg : xs) = case arg of
+          [x] -> checkArgs x:xs
+          (Atom x : xargs) -> do
+              Type argType <- getVar env x
         typeName = case unwrap newType of CustomT n _ -> n
         buildConst i c [] =
           Custom { valType = unwrap newType
