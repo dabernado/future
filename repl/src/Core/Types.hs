@@ -296,10 +296,10 @@ instance Show FutureType where
     ") " ++ show return ++ ")"
   show (FuncT (DottedList _ args vararg) Nothing) =
     "(:Func (" ++ unwords (map showVal args)
-    ++ " . " ++ show vararg ++ "))"
+    ++ " . " ++ showVal vararg ++ "))"
   show (FuncT (DottedList _ args vararg) (Just return)) =
     "(:Func (" ++ unwords (map showVal args)
-    ++ " . " ++ show vararg ++
+    ++ " . " ++ showVal vararg ++
     ") " ++ show return ++ ")"
 
 unwrap :: FutureType -> FutureType

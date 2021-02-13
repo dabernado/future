@@ -14,8 +14,11 @@ eval env val@(Integer _) = return val
 eval env val@(Float _) = return val
 eval env val@(Ratio _) = return val
 eval env val@(List _ []) = return val
-eval env val@(DottedList _ _ _) = return val
 eval env (Atom id) = getVar env id
+eval env (DottedList t xs x) = do
+  list <- mapM (eval env) xs
+  val <- eval env x
+  return $ DottedList t list val
 eval env (List _ [Atom "quote", val]) = return val
 eval env (List _ [Atom "quasiquote", List _ val]) = mapM (evalQQ env) val >>= (return . List AnyT)
 eval env (List _ [Atom "quasiquote", val]) = return val
@@ -261,7 +264,6 @@ constructFunc env (PartialT 2 (FuncT _ _)) (List _ params : args) = do
   types <- mapM (constructVal TypeT) evaled
   apply (Type (PartialT 1 (FuncT (List TypeT types) Nothing))) args
 constructFunc env (PartialT 2 (FuncT _ _)) (DottedList _ params vararg : args) = do
-  evaled <- mapM (eval env) params
-  types <- mapM (constructVal TypeT) evaled
+  types <- mapM (constructVal TypeT) params
   vt <- constructVal TypeT vararg
   apply (Type (PartialT 1 (FuncT (DottedList (TypeT, TypeT) types vt) Nothing))) args
