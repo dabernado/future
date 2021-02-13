@@ -62,6 +62,12 @@ In addition, Future also supports defining custom data types...
     (nil))
 
 >>> :Type (:Maybe :?)
+
+nil
+>>> (:Maybe :?) nil
+
+(just 3)
+>>> (:Maybe :?) just 3
 ```
 
 ...as well as the ability to use types as first-class values.
