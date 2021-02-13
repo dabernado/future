@@ -286,7 +286,7 @@ instance Show FutureType where
   show (CustomT n []) = n
   show (CustomT n ts) = "(" ++ n ++ " " ++ unwords (map show ts) ++ ")"
   show (ListT t) = "(:List " ++ show t ++ ")"
-  show (DottedListT a b) = "(:DottedList " ++ show a ++ " " ++ show b ++ ")"
+  show (DottedListT a b) = "(:Pair " ++ show a ++ " " ++ show b ++ ")"
   show (VectorT t) = "(:Vector " ++ show t ++ ")"
   show (PartialT _ t) = show t
   show (PrimitiveFuncT) = "(:Func <primitive>)"

@@ -14,6 +14,7 @@ eval env val@(Integer _) = return val
 eval env val@(Float _) = return val
 eval env val@(Ratio _) = return val
 eval env val@(List _ []) = return val
+eval env val@(DottedList _ _ _) = return val
 eval env (Atom id) = getVar env id
 eval env (List _ [Atom "quote", val]) = return val
 eval env (List _ [Atom "quasiquote", List _ val]) = mapM (evalQQ env) val >>= (return . List AnyT)
