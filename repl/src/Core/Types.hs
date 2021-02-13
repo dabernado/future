@@ -43,7 +43,6 @@ data FutureVal = Atom String
                | Ratio Rational
                | String String
                | Char Char
-               | Bool Bool
                | Type FutureType
                | List FutureType [FutureVal]
                | Vector FutureType (Vector FutureVal)
@@ -65,11 +64,20 @@ data FutureVal = Atom String
                           , closure :: Env
                           }
 
+makeBool :: Bool -> FutureVal
+makeBool True =  Custom { valType = CustomT ":Bool" []
+                        , variant = (0, "true")
+                        , inner = []
+                        }
+makeBool False =  Custom { valType = CustomT ":Bool" []
+                         , variant = (1, "false")
+                         , inner = []
+                         }
+
 instance Eq FutureVal where
   (==) (Atom a) (Atom b) = a == b
   (==) (String a) (String b) = a == b
   (==) (Char a) (Char b) = a == b
-  (==) (Bool a) (Bool b) = a == b
   (==) (Integer a) (Integer b) = a == b
   (==) (Float a) (Float b) = a == b
   (==) (Ratio a) (Ratio b) = a == b
@@ -85,7 +93,6 @@ instance Ord FutureVal where
   (<=) (Atom a) (Atom b) = a <= b
   (<=) (String a) (String b) = a <= b
   (<=) (Char a) (Char b) = a <= b
-  (<=) (Bool a) (Bool b) = a <= b
   (<=) (Integer a) (Integer b) = a <= b
   (<=) (Float a) (Float b) = a <= b
   (<=) (Ratio a) (Ratio b) = a <= b
@@ -102,8 +109,6 @@ showVal :: FutureVal -> String
 showVal v@(Atom a) = a 
 showVal v@(String s) = "\"" ++ s ++ "\""
 showVal v@(Char c) = '\\':(c:"")
-showVal v@(Bool True) = "true"
-showVal v@(Bool False) = "false"
 showVal v@(Integer n) = show n
 showVal v@(Float f) = show f
 showVal v@(Ratio r) = show (numerator r) ++ "/" ++ show (denominator r)
@@ -127,7 +132,6 @@ getType :: FutureVal -> FutureType
 getType (Atom _) = SymbolT
 getType (String _) = StringT
 getType (Char _) = CharT
-getType (Bool _) = BoolT
 getType (Integer _) = IntegerT
 getType (Float _) = FloatT
 getType (Ratio _) = RatioT
@@ -231,7 +235,6 @@ extractValue (Right val) = val
 
 -- TODO: Add type for maps
 data FutureType = SymbolT
-                | BoolT
                 | CharT
                 | StringT
                 | IntegerT
@@ -251,9 +254,10 @@ data FutureType = SymbolT
                            , returnType :: FutureType
                            }
 
+boolT = CustomT ":Bool" []
+
 instance Eq FutureType where
   (==) CharT CharT = True
-  (==) BoolT BoolT = True
   (==) IntegerT IntegerT = True
   (==) FloatT FloatT = True
   (==) RatioT RatioT = True
@@ -274,7 +278,6 @@ instance Show FutureType where
   show (SymbolT) = ":Symbol"
   show (StringT) = ":String"
   show (CharT) = ":Char"
-  show (BoolT) = ":Bool"
   show (IntegerT) = ":Int"
   show (FloatT) = ":Float"
   show (RatioT) = ":Ratio"

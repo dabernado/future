@@ -178,10 +178,7 @@ parseAtom = do
     first <- letter <|> symbol
     rest <- many (letter <|> digit <|> symbol)
     let atom = first:rest
-    return $ case atom of
-               "true" -> Bool True
-               "false" -> Bool False
-               _ -> Atom atom
+    return $ Atom atom
 
 parseExpr :: Parser FutureVal
 parseExpr = parseAtom

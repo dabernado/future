@@ -10,7 +10,6 @@ import Data.Sequence (update, fromList)
 eval :: Env -> FutureVal -> IOResult FutureVal
 eval env val@(Char _) = return val
 eval env val@(String _) = return val
-eval env val@(Bool _) = return val
 eval env val@(Integer _) = return val
 eval env val@(Float _) = return val
 eval env val@(Ratio _) = return val
@@ -22,9 +21,9 @@ eval env (List _ [Atom "quasiquote", val]) = return val
 eval env (List _ [Atom "if", pred, conseq, alt]) = do
   result <- eval env pred
   case result of
-    Bool False -> eval env alt
-    Bool True -> eval env conseq
-    _ -> throwError $ TypeError BoolT (getType result)
+    Custom (CustomT ":Bool" []) (1,"false") [] -> eval env alt
+    Custom (CustomT ":Bool" []) (0,"true") [] -> eval env conseq
+    _ -> throwError $ TypeError boolT (getType result)
 eval env form@(List _ (Atom "cond" : clauses)) =
   if null clauses
   then throwError $ BadSpecialForm "no clause in cond expression: " form
@@ -43,7 +42,7 @@ eval env form@(List _ (Atom "case" : key : clauses)) =
          List _ (List _ datums : exprs) -> do
            result <- eval env key
            equality <- mapM (\x -> eval env (List AnyT [Atom "=", x, result])) datums
-           if Bool True `elem` equality
+           if makeBool True `elem` equality
               then mapM (eval env) exprs >>= return . last
               else eval env $ List AnyT (Atom "case" : key : tail clauses)
          _ -> throwError $ BadSpecialForm "ill-formed case expression: " form
@@ -110,7 +109,6 @@ expandParams env [] = return []
 evalQQ :: Env -> FutureVal -> IOResult FutureVal
 evalQQ env val@(Char _) = return val
 evalQQ env val@(String _) = return val
-evalQQ env val@(Bool _) = return val
 evalQQ env val@(Integer _) = return val
 evalQQ env val@(Float _) = return val
 evalQQ env val@(Ratio _) = return val

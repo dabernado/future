@@ -4,6 +4,11 @@ import Core.Types
 
 import Control.Monad.Except
 
+primVals :: [(String, FutureVal)]
+primVals = [ ("true", makeBool True)
+           , ("false", makeBool False)
+           ]
+
 primOps :: [(String, [FutureVal] -> Result FutureVal)]
 primOps = [ ("+", numBinop (+))
           , ("-", numBinop (-))
@@ -38,14 +43,14 @@ primOps = [ ("+", numBinop (+))
     valBinop = binop valBinopTypeCheck
     boolBinop = binop boolBinopTypeCheck
     strBinop = binop strBinopTypeCheck
-    eq a b = Bool $ a == b
-    notEq a b = Bool $ a /= b
-    lt a b = Bool $ a < b
-    gt a b = Bool $ a > b
-    ltEq a b = Bool $ a <= b
-    gtEq a b = Bool $ a >= b
-    andF (Bool a) (Bool b) = Bool $ a && b
-    orF (Bool a) (Bool b) = Bool $ a || b
+    eq a b = makeBool $ a == b
+    notEq a b = makeBool $ a /= b
+    lt a b = makeBool $ a < b
+    gt a b = makeBool $ a > b
+    ltEq a b = makeBool $ a <= b
+    gtEq a b = makeBool $ a >= b
+    andF (Custom _ (a,_) _) (Custom _ (b,_) _) = makeBool $ (a == 0) && (b == 0)
+    orF (Custom _ (a,_) _) (Custom _ (b,_) _) = makeBool $ (a == 0) || (b == 0)
     concatF (String a) (String b) = String $ a ++ b
 
 getTypePrim :: [FutureVal] -> Result FutureVal
@@ -79,8 +84,8 @@ cons [x, y] = return $ DottedList (AnyT, AnyT) [x] y
 cons args = throwError $ NumArgs 2 args
 
 isSymbol :: [FutureVal] -> Result FutureVal
-isSymbol [Atom _] = return $ Bool True
-isSymbol [_] = return $ Bool False
+isSymbol [Atom _] = return $ makeBool True
+isSymbol [_] = return $ makeBool False
 isSymbol n = throwError $ NumArgs 1 n
 
 symToString :: [FutureVal] -> Result FutureVal
@@ -101,7 +106,7 @@ makeString cs = case charTypeCheck cs of
     unpackChar (Char c) = c
     charTypeCheck :: [FutureVal] -> Result FutureVal
     charTypeCheck (Char _ : cs) = charTypeCheck cs
-    charTypeCheck [] = return $ Bool True
+    charTypeCheck [] = return $ makeBool True
     charTypeCheck (x:xs) = throwError $ TypeError CharT (getType x)
 
 strLength :: [FutureVal] -> Result FutureVal
@@ -143,22 +148,25 @@ intBinopTypeCheck (Integer _) succ@(Integer _) = return succ
 intBinopTypeCheck (Integer _) b = throwError $ TypeError IntegerT (getType b)
 intBinopTypeCheck a _ = throwError $ TypeError IntegerT (getType a)
 
-boolBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
-boolBinopTypeCheck (Bool _) succ@(Bool _) = return succ
-boolBinopTypeCheck (Bool _) b = throwError $ TypeError BoolT (getType b)
-boolBinopTypeCheck a _ = throwError $ TypeError BoolT (getType a)
-
 strBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
 strBinopTypeCheck (String _) succ@(String _) = return succ
 strBinopTypeCheck a@(String _) b = throwError $ TypeError StringT (getType b)
 strBinopTypeCheck a _ = throwError $ TypeError StringT (getType a)
+
+boolBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
+boolBinopTypeCheck a b = if isBool a
+  then if isBool b then return b else throwError $ TypeError boolT (getType b)
+  else throwError $ TypeError boolT (getType a)
+  where boolT = CustomT ":Bool" []
+        isBool (Custom t _ _) = if t /= boolT then False else True
+        isBool _ = False
 
 
 -- Primitive Types --
 
 primTypes :: [(String, FutureVal)]
 primTypes = [ (":Symbol", Type SymbolT)
-            , (":Bool", Type BoolT)
+            , (":Bool", Type boolT)
             , (":Char", Type CharT)
             , (":String", Type StringT)
             , (":Int", Type IntegerT)

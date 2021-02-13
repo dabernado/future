@@ -2,7 +2,7 @@ module Main where
 
 import Parser (readExpr)
 import Evaluator (eval)
-import Core.Primitives (primOps, primTypes)
+import Core.Primitives (primOps, primTypes, primVals)
 import Core.Types (
     Env
   , FutureVal(..)
@@ -39,8 +39,9 @@ until_ pred prompt action = do
 
 primitiveBindings :: IO Env
 primitiveBindings = nullEnv
-                >>= (flip bindVars $ map makePrimitive primOps)
                 >>= (flip bindVars primTypes)
+                >>= (flip bindVars primVals)
+                >>= (flip bindVars $ map makePrimitive primOps)
     where makePrimitive (var, func) = (var, Primitive func)
 
 runOne :: String -> IO ()
