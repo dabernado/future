@@ -184,4 +184,9 @@ primTypes = [ (":Symbol", Type SymbolT)
                                                            , result = Nothing
                                                            }
                                       })
+            , (":λ", Type PartialT { args = 2
+                                      , returnType = FuncT { paramsType = List AnyT []
+                                                           , result = Nothing
+                                                           }
+                                      })
             ]
