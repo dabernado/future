@@ -179,12 +179,12 @@ primTypes = [ (":Symbol", Type SymbolT)
                                             , returnType = DottedListT AnyT AnyT
                                             })
             , (":Vector", Type PartialT { args = 1, returnType = VectorT AnyT })
-            , (":Func", Type PartialT { args = 2
-                                      , returnType = FuncT { paramsType = List AnyT []
-                                                           , result = Nothing
-                                                           }
-                                      })
             , (":λ", Type PartialT { args = 2
+                                    , returnType = FuncT { paramsType = List AnyT []
+                                                         , result = Nothing
+                                                         }
+                                    })
+            , (":Func", Type PartialT { args = 2
                                       , returnType = FuncT { paramsType = List AnyT []
                                                            , result = Nothing
                                                            }
