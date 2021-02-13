@@ -290,9 +290,9 @@ instance Show FutureType where
   show (VectorT t) = "(:Vector " ++ show t ++ ")"
   show (PartialT _ t) = show t
   show (PrimitiveFuncT) = "(:Func <primitive>)"
-  show (FuncT (List _ args) Nothing) = "(:Func (" ++ unwords (map showVal args) ++ "))"
+  show (FuncT (List _ args) Nothing) = "(:Func '(" ++ unwords (map showVal args) ++ "))"
   show (FuncT (List _ args) (Just return)) =
-    "(:Func (" ++ unwords (map showVal args) ++
+    "(:Func '(" ++ unwords (map showVal args) ++
     ") " ++ show return ++ ")"
   show (FuncT (DottedList _ args vararg) Nothing) =
     "(:Func (" ++ unwords (map showVal args)
