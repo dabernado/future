@@ -29,7 +29,7 @@ Functions are dynamically typed when written without type declarations...
 (defn greet (name)
     (++ "Hello " name "!"))
 
->>> (:Func (:?) :?) (fn (name) ...)
+>>> (:Func '(:?) :?) (fn (name) ...)
 ```
 
 ...but statically typed when written with them.
@@ -38,7 +38,7 @@ Functions are dynamically typed when written without type declarations...
 (defn add (:Int x :Int y) :Int
     (+ x y))
 
->>> (:Func (:Int :Int) :Int) (fn (x y) ...)
+>>> (:Func '(:Int :Int) :Int) (fn (x y) ...)
 ```
 
 Values can be partially or fully typed
@@ -76,7 +76,7 @@ nil
 (defn check-type (:Type t v)
     (= t (type v)))
 
->>> (:Func (:Type :?) :?) (fn (t v) ...)
+>>> (:Func '(:Type :?) :?) (fn (t v) ...)
 
 (check-type :Int 3)
 >>> :Bool true
