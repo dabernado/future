@@ -265,6 +265,8 @@ instance Eq FutureType where
   (==) (VectorT a) (VectorT b) = a == b
   (==) (DottedListT a1 a2) (DottedListT b1 b2) = (a1 == b1) && (a2 == b2)
   (==) (CustomT an as) (CustomT bn bs) = (an == bn) && (as == bs)
+  (==) (FuncT (Type AnyT) r1) (FuncT _ r2) = r1 == r2
+  (==) (FuncT _ r1) (FuncT (Type AnyT) r2) = r1 == r2
   (==) (FuncT p1 r1) (FuncT p2 r2) = (p1 == p2) && (r1 == r2)
   (==) (PartialT _ a) (PartialT _ b) = a == b
   (==) (PartialT _ a) b = a == b

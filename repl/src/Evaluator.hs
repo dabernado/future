@@ -270,5 +270,5 @@ constructFunc env (PartialT 2 (FuncT _ _)) (DottedList _ params vararg : args) =
   types <- mapM (constructVal TypeT) params
   vt <- constructVal TypeT vararg
   apply (Type (PartialT 1 (FuncT (DottedList (TypeT, TypeT) types vt) (Just AnyT)))) args
-constructFunc env (PartialT 2 t@(FuncT _ _)) (arg@(Function _ _ _ _) : args) =
-  constructVal t arg
+constructFunc env (PartialT 2 _) (arg@(Function _ _ _ _) : args) =
+  constructVal (FuncT (Type AnyT) (Just AnyT)) arg
