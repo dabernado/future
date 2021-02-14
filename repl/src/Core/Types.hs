@@ -117,13 +117,13 @@ showVal v@(List _ xs) = "(" ++ unwordsList xs ++ ")"
 showVal v@(DottedList _ x xs) = "(" ++ unwordsList x ++ " . " ++ show xs ++ ")"
 showVal val@(Vector _ v) = "(" ++ (unwordsList . Vector.toList) v ++ ")"
 showVal (Type t) = show t
-showVal (Primitive _) = "<primitive>"
+showVal (Primitive _) = "(fn ...)"
 showVal (TypeConst _ _ _ _) = "<constructor>"
 showVal v@(Function { params = args
                    , vararg = varargs
                    , body = _
                    , closure = env
-                   }) = " (fn (" ++ unwords [n | (n,_) <- args] ++
+                   }) = "(fn (" ++ unwords [n | (n,_) <- args] ++
                         (case varargs of
                            Nothing -> ""
                            Just arg -> " . " ++ arg) ++ ") ...)"
@@ -139,8 +139,8 @@ getType (Custom t _ _) = t
 getType (List t _) = ListT t
 getType (DottedList (t1,t2) _ _) = DottedListT t1 t2
 getType (Vector t _) = VectorT t
-getType (Primitive _) = PrimitiveFuncT
 getType (Type _ ) = TypeT
+getType (Primitive _) = FuncT (Type AnyT) (Just AnyT)
 getType (TypeConst input output _ _) =
   FuncT { paramsType = List TypeT (map (Type) input)
         , result = Just output
@@ -246,7 +246,6 @@ data FutureType = SymbolT
                 | CustomT String [FutureType]
                 | AnyT
                 | TypeT
-                | PrimitiveFuncT
                 | FuncT { paramsType :: FutureVal
                         , result :: Maybe FutureType
                         }
@@ -262,7 +261,6 @@ instance Eq FutureType where
   (==) FloatT FloatT = True
   (==) RatioT RatioT = True
   (==) TypeT TypeT = True
-  (==) PrimitiveFuncT PrimitiveFuncT = True
   (==) (ListT a) (ListT b) = a == b
   (==) (VectorT a) (VectorT b) = a == b
   (==) (DottedListT a1 a2) (DottedListT b1 b2) = (a1 == b1) && (a2 == b2)
@@ -289,7 +287,7 @@ instance Show FutureType where
   show (DottedListT a b) = "(:Pair " ++ show a ++ " " ++ show b ++ ")"
   show (VectorT t) = "(:Vector " ++ show t ++ ")"
   show (PartialT _ t) = show t
-  show (PrimitiveFuncT) = "(:Func <primitive>)"
+  show (FuncT (Type AnyT) _) = "(:Func :? :?)"
   show (FuncT (List _ args) Nothing) = "(:Func '(" ++ unwords (map showVal args) ++ "))"
   show (FuncT (List _ args) (Just return)) =
     "(:Func '(" ++ unwords (map showVal args) ++

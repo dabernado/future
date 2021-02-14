@@ -128,7 +128,7 @@ binop typeCheck op params@(x:xs) = case foldM typeCheck x xs of
                            Right _ -> (return . foldl1 op) params
 
 valBinopTypeCheck :: FutureVal -> FutureVal -> Result FutureVal
-valBinopTypeCheck (Primitive _) _ = throwError $ TypeError IntegerT PrimitiveFuncT
+valBinopTypeCheck a@(Primitive _) _ = throwError $ TypeError IntegerT (getType a)
 valBinopTypeCheck a@(Function _ _ _ _) _ = throwError $ TypeError IntegerT (getType a)
 valBinopTypeCheck a b = if (showType a) == (showType b)
                         then return b
@@ -180,13 +180,13 @@ primTypes = [ (":Symbol", Type SymbolT)
                                             })
             , (":Vector", Type PartialT { args = 1, returnType = VectorT AnyT })
             , (":λ", Type PartialT { args = 2
-                                    , returnType = FuncT { paramsType = List AnyT []
-                                                         , result = Nothing
+                                    , returnType = FuncT { paramsType = Type AnyT
+                                                         , result = Just AnyT
                                                          }
                                     })
             , (":Func", Type PartialT { args = 2
-                                      , returnType = FuncT { paramsType = List AnyT []
-                                                           , result = Nothing
+                                      , returnType = FuncT { paramsType = Type AnyT
+                                                           , result = Just AnyT
                                                            }
                                       })
             ]

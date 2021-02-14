@@ -217,6 +217,7 @@ constructVal t@(CustomT n1 ts) v@(Custom vt variant vs) = if checkType v t
     return $ Custom t variant vs
   else throwError $ TypeError t vt
 -- TODO: Evaluate return type via function body
+constructVal t@(FuncT (Type AnyT) _rt) func@(Function _ _ _ _) = return func
 constructVal t@(FuncT (List TypeT args) _rt) func@(Function params Nothing b c) =
   if length args /= length params
      then throwError $ TypeError t (getType func)
@@ -259,11 +260,15 @@ constructType n (CustomT name ts) t = Type (PartialT (n-1) (CustomT name updated
   where updatedTypes = toList $ update ((length ts) - n) t $ fromList ts
 
 constructFunc :: Env -> FutureType -> [FutureVal] -> IOResult FutureVal
+constructFunc env (PartialT 2 t@(FuncT _ _)) (arg@(Type AnyT) : args) =
+  apply (Type (PartialT 1 (FuncT arg (Just AnyT)))) args
 constructFunc env (PartialT 2 (FuncT _ _)) (List _ params : args) = do
   evaled <- mapM (eval env) params
   types <- mapM (constructVal TypeT) evaled
-  apply (Type (PartialT 1 (FuncT (List TypeT types) Nothing))) args
+  apply (Type (PartialT 1 (FuncT (List TypeT types) (Just AnyT)))) args
 constructFunc env (PartialT 2 (FuncT _ _)) (DottedList _ params vararg : args) = do
   types <- mapM (constructVal TypeT) params
   vt <- constructVal TypeT vararg
-  apply (Type (PartialT 1 (FuncT (DottedList (TypeT, TypeT) types vt) Nothing))) args
+  apply (Type (PartialT 1 (FuncT (DottedList (TypeT, TypeT) types vt) (Just AnyT)))) args
+constructFunc env (PartialT 2 t@(FuncT _ _)) (arg@(Function _ _ _ _) : args) =
+  constructVal t arg
