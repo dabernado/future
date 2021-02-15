@@ -20,7 +20,7 @@ true        ; :Bool
 [1 2 3]     ; :Vector
 {:a 1 :b 2} ; :Map
 (1 . 2)     ; :Pair
-#(+ %1 %2)  ; :Func
+#(+ %1 %2)  ; :Fn
 ```
 
 Functions are dynamically typed when written without type declarations...
@@ -29,7 +29,7 @@ Functions are dynamically typed when written without type declarations...
 (defn greet (name)
     (++ "Hello " name "!"))
 
->>> (:Func '(:?) :?) (fn (name) ...)
+>>> (:Fn '(:?) :?) (fn (name) ...)
 ```
 
 ...but statically typed when written with them.
@@ -38,7 +38,7 @@ Functions are dynamically typed when written without type declarations...
 (defn add (:Int x :Int y) :Int
     (+ x y))
 
->>> (:Func '(:Int :Int) :Int) (fn (x y) ...)
+>>> (:Fn '(:Int :Int) :Int) (fn (x y) ...)
 ```
 
 Values can be partially or fully typed
@@ -76,7 +76,7 @@ nil
 (defn check-type (:Type t v)
     (= t (type v)))
 
->>> (:Func '(:Type :?) :?) (fn (t v) ...)
+>>> (:Fn '(:Type :?) :?) (fn (t v) ...)
 
 (check-type :Int 3)
 >>> :Bool true
