@@ -174,19 +174,9 @@ primTypes = [ (":Symbol", Type SymbolT)
             , (":Ratio", Type RatioT)
             , (":?", Type AnyT)
             , (":Type", Type TypeT)
+            , (":λ", Type (PartialT 2 (FuncT (Type AnyT) (Just AnyT))))
+            , (":Fn", Type (PartialT 2 (FuncT (Type AnyT) (Just AnyT))))
             , (":List", Type PartialT { args = 1, returnType = ListT AnyT })
-            , (":Pair", Type PartialT { args = 2
-                                            , returnType = DottedListT AnyT AnyT
-                                            })
             , (":Vector", Type PartialT { args = 1, returnType = VectorT AnyT })
-            , (":λ", Type PartialT { args = 2
-                                    , returnType = FuncT { paramsType = Type AnyT
-                                                         , result = Just AnyT
-                                                         }
-                                    })
-            , (":Func", Type PartialT { args = 2
-                                      , returnType = FuncT { paramsType = Type AnyT
-                                                           , result = Just AnyT
-                                                           }
-                                      })
+            , (":Pair", Type PartialT { args = 2, returnType = DottedListT AnyT AnyT })
             ]

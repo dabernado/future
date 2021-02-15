@@ -36,6 +36,8 @@ bindVars :: Env -> [(String, FutureVal)] -> IO Env
 bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
     where extendEnv bindings env = liftM (++ env) (return bindings)
 
+data TypeIndex = Base Int | Recursive [(Int, TypeIndex)]
+
 -- TODO: Add maps
 data FutureVal = Atom String
                | Integer Int
@@ -49,13 +51,13 @@ data FutureVal = Atom String
                | DottedList (FutureType, FutureType) [FutureVal] FutureVal
                | Custom { valType :: FutureType
                         , variant :: (Int, String)
-                        , inner :: [(FutureVal, Int)]
+                        , inner :: [(FutureVal, TypeIndex)]
                         }
                | Primitive ([FutureVal] -> Result FutureVal)
                | TypeConst { input :: [FutureType]
                            , output :: FutureType
                            , enum :: (Int, String)
-                           , typeIndices :: [Int]
+                           , typeIndices :: [TypeIndex]
                            }
                | Function { params :: [(String, FutureType)]
                           -- TODO: Add type info to vararg
@@ -85,7 +87,8 @@ instance Eq FutureVal where
   (==) (DottedList _ as a) (DottedList _ bs b) = (a == b) && (as == bs)
   (==) (Vector _ a) (Vector _ b) = a == b
   (==) (Type a ) (Type b ) = a == b
-  (==) (Custom t1 v1 xs) (Custom t2 v2 ys) = (t1 == t2) && (v1 == v2) && (xs == ys)
+  (==) (Custom t1 v1 xs) (Custom t2 v2 ys) =
+    (t1 == t2) && (v1 == v2) && ([v | (v,_) <- xs] == [v | (v,_) <- ys])
   (==) (TypeConst i1 o1 v1 _) (TypeConst i2 o2 v2 _) =
     (i1 == i2) && (v1 == v2) && (o1 == o2)
 
@@ -289,16 +292,16 @@ instance Show FutureType where
   show (DottedListT a b) = "(:Pair " ++ show a ++ " " ++ show b ++ ")"
   show (VectorT t) = "(:Vector " ++ show t ++ ")"
   show (PartialT _ t) = show t
-  show (FuncT (Type AnyT) _) = "(:Func :? :?)"
-  show (FuncT (List _ args) Nothing) = "(:Func '(" ++ unwords (map showVal args) ++ "))"
+  show (FuncT (Type AnyT) _) = "(:Fn :? :?)"
+  show (FuncT (List _ args) Nothing) = "(:Fn '(" ++ unwords (map showVal args) ++ "))"
   show (FuncT (List _ args) (Just return)) =
-    "(:Func '(" ++ unwords (map showVal args) ++
+    "(:Fn '(" ++ unwords (map showVal args) ++
     ") " ++ show return ++ ")"
   show (FuncT (DottedList _ args vararg) Nothing) =
-    "(:Func (" ++ unwords (map showVal args)
+    "(:Fn (" ++ unwords (map showVal args)
     ++ " . " ++ showVal vararg ++ "))"
   show (FuncT (DottedList _ args vararg) (Just return)) =
-    "(:Func (" ++ unwords (map showVal args)
+    "(:Fn (" ++ unwords (map showVal args)
     ++ " . " ++ showVal vararg ++
     ") " ++ show return ++ ")"
 

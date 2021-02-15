@@ -127,30 +127,54 @@ defineConsts env newType targs consts = do
   where toConstVal ((List _ (Atom const : args)), i) = do
           argMaps <- checkArgs args
           return $ (const, buildConst i const argMaps)
-        checkArgs :: [FutureVal] -> IOResult [(FutureType, Int)]
-        checkArgs [] = return []
-        checkArgs (Atom x : xs) = case elemIndex x targs of
-          Just n -> checkArgs xs >>= (return . (:) (AnyT, n))
-          Nothing -> if x /= typeName then do
-              Type argType <- getVar env x
-              checkArgs xs >>= (return . (:) (argType, -1))
-            else checkArgs xs >>= (return . (:) (newType, -1))
-        checkArgs (List _ arg : xs) = case arg of
-          [x] -> checkArgs x:xs
-          (Atom x : xargs) -> do
-              Type argType <- getVar env x
         typeName = case unwrap newType of CustomT n _ -> n
-        buildConst i c [] =
-          Custom { valType = unwrap newType
-                 , variant = (i, c)
-                 , inner = []
-                 }
+        buildConst i c [] = Custom (unwrap newType) (i, c) []
         buildConst i c args =
           TypeConst { input = [t | (t,_) <- args]
                     , output = unwrap newType
                     , enum = (i, c)
                     , typeIndices = [n | (_,n) <- args]
                     }
+        hasTypeArg [] = False
+        hasTypeArg (List _ x : xs) = hasTypeArg x && hasTypeArg xs
+        hasTypeArg (Atom (':':_) : xs) = hasTypeArg xs
+        hasTypeArg (Atom x : xs) = True
+        rmTypeArgs (List _ x : xs) = do
+          types <- rmTypeArgs x
+          rmTypeArgs xs >>= (return . (:) (List AnyT x))
+        rmTypeArgs (Atom x@(':':_) : xs) = do
+          t <- getVar env x
+          rmTypeArgs xs >>= (return . (:) t)
+        rmTypeArgs (Atom x : xs) = rmTypeArgs xs >>= (return . (:) (Type AnyT))
+        checkArgs :: [FutureVal] -> IOResult [(FutureType, TypeIndex)]
+        checkArgs [] = return []
+        checkArgs (Atom x : xs) = case elemIndex x targs of
+          Just n -> checkArgs xs >>= (return . (:) (AnyT, Base n))
+          Nothing -> if x /= typeName then do
+              Type argType <- getVar env x
+              checkArgs xs >>= (return . (:) (argType, Base $ -1))
+            else checkArgs xs >>= (return . (:) (newType, Base $ -1))
+        checkArgs l@(List _ arg : xs) = case arg of
+          [x] -> checkArgs l
+          (Atom x : xargs) -> if x /= typeName then do
+              argType <- getVar env x
+              typeList <- rmTypeArgs xargs
+              Type inputType <- apply argType typeList
+              checkArgs xs >>= (return . (:) (inputType, makeTypeIndex xargs))
+            else do
+              typeList <- rmTypeArgs xargs
+              Type inputType <- apply (Type newType) typeList
+              checkArgs xs >>= (return . (:) (inputType, makeTypeIndex xargs))
+                where
+                  makeTypeIndex list = if hasTypeArg list
+                    then Recursive $ makeTypeIndexList list
+                    else Base $ -1
+                  makeTypeIndexList (Atom t : ts) = case elemIndex t targs of
+                    Just n -> case elemIndex (Atom t) xargs of
+                      Just i -> (n, Base i) : makeTypeIndexList ts
+                    Nothing -> makeTypeIndexList ts
+                  makeTypeIndexList (l@(List _ t) : ts) = case elemIndex l xargs of
+                    Just n -> (n, makeTypeIndex t) : makeTypeIndexList ts
 
 apply :: FutureVal -> [FutureVal] -> IOResult FutureVal
 apply (Primitive func) args = liftResult $ func args
