@@ -1,6 +1,10 @@
 module Core.Types where
 
 import Data.IORef
+import Data.List (elemIndex)
+import Data.Foldable (toList)
+import Data.Maybe (fromJust)
+import Data.Sequence (update, fromList)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import Data.Ratio (numerator, denominator, (%))
@@ -37,6 +41,7 @@ bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
     where extendEnv bindings env = liftM (++ env) (return bindings)
 
 data TypeIndex = Base Int | Recursive [(Int, TypeIndex)]
+  deriving (Eq)
 
 -- TODO: Add maps
 data FutureVal = Atom String
@@ -312,14 +317,58 @@ unwrap t = t
 checkType :: FutureVal -> FutureType -> Bool
 checkType = (==) . getType
 
-checkTypeList :: [FutureType] -> [FutureVal] -> IOResult [FutureVal]
-checkTypeList [] [] = return []
+checkTypeList :: [FutureType] -> [FutureVal] -> IOResult ()
+checkTypeList [] [] = return ()
 checkTypeList (t:ts) (v:vs) =
   if checkType v t
-     then checkTypeList ts vs >>= (return . (:) v)
+     then checkTypeList ts vs
      else throwError $ TypeError t (getType v)
 
-indexTypes :: [Int] -> [FutureType] -> [FutureType]
-indexTypes [] _ = []
-indexTypes (-1:is) ts = AnyT : indexTypes is ts
-indexTypes (i:is) ts = (ts !! i) : indexTypes is ts
+checkTypeIndices :: [FutureVal] -> [TypeIndex] -> [FutureType] -> IOResult ()
+checkTypeIndices [] [] _ = return ()
+checkTypeIndices (_:vs) (Base (-1) : is) ts = checkTypeIndices vs is ts
+checkTypeIndices (v:vs) (Base i : is) ts = if getType v /= (ts !! i)
+  then throwError $ TypeError (ts !! i) (getType v)
+  else checkTypeIndices vs is ts
+checkTypeIndices (v:vs) (Recursive xs : is) ts = do
+  checkTypeArgs v xs
+  checkTypeIndices vs is ts
+    where checkTypeArgs :: FutureType -> [(Int, TypeIndex)] -> IOResult ()
+          checkTypeArgs _ [] = return ()
+          checkTypeArgs v ((n, Base i) : ns) =
+            let inner = getInner v n
+             in do
+               checkTypeList (replicate (length inner) (ts !! i)) inner
+               checkTypeArgs v ns
+          checkTypeArgs v ((n, Recursive l) : ns) =
+            let inner = getInner v n
+             in do
+               checkTypeArgs (List AnyT inner) l
+               checkTypeArgs v ns
+
+indexTypes :: [FutureType] -> [TypeIndex] -> [FutureType] -> [FutureType]
+indexTypes as is ts = wrapped is
+  where wrapped [] = []
+        wrapped (Base (-1) : rest) = AnyT : wrapped rest
+        wrapped (Base i : rest) = (ts !! i) : wrapped rest
+        wrapped (i@(Recursive l) : rest) =
+          (recursive l $ as !! (fromJust $ elemIndex i is)) : wrapped rest
+        recursive [] t = t
+        recursive ((n, Base i) : xs) t = recursive xs $ fillType t n (ts !! i)
+
+-- TODO: Add clauses for function types
+fillType :: FutureType -> Int -> FutureType -> FutureType
+fillType (ListT _) 0 t = ListT t
+fillType (DottedListT _ x) 0 t = DottedListT t x
+fillType (DottedListT x _) 1 t = DottedListT x t
+fillType (VectorT _) 0 t = VectorT t
+fillType (CustomT name l) n t = CustomT name $ toList $ update n t $ fromList l
+fillType ft n t = fillType (unwrap ft) n t
+
+getInner :: FutureVal -> Int -> [FutureVal]
+getInner (List _ x) 0 = x
+getInner (DottedList _ x _) 0 = x
+getInner (DottedList _ _ x) 1 = [x]
+getInner (Vector _ x) 0 = toList x
+-- Look through l and find the val with a TypeIndex that matches Base n
+getInner (Custom _ _ l) n =

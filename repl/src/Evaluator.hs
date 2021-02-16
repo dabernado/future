@@ -5,6 +5,7 @@ import Core.Types
 import Control.Monad.Except
 import Data.List (elemIndex)
 import Data.Foldable (toList)
+import Data.Maybe (fromJust)
 import Data.Sequence (update, fromList)
 
 eval :: Env -> FutureVal -> IOResult FutureVal
@@ -139,6 +140,7 @@ defineConsts env newType targs consts = do
         hasTypeArg (List _ x : xs) = hasTypeArg x && hasTypeArg xs
         hasTypeArg (Atom (':':_) : xs) = hasTypeArg xs
         hasTypeArg (Atom x : xs) = True
+        rmTypeArgs [] = return []
         rmTypeArgs (List _ x : xs) = do
           types <- rmTypeArgs x
           rmTypeArgs xs >>= (return . (:) (List AnyT x))
@@ -169,12 +171,12 @@ defineConsts env newType targs consts = do
                   makeTypeIndex list = if hasTypeArg list
                     then Recursive $ makeTypeIndexList list
                     else Base $ -1
+                  makeTypeIndexList [] = []
                   makeTypeIndexList (Atom t : ts) = case elemIndex t targs of
-                    Just n -> case elemIndex (Atom t) xargs of
-                      Just i -> (n, Base i) : makeTypeIndexList ts
                     Nothing -> makeTypeIndexList ts
-                  makeTypeIndexList (l@(List _ t) : ts) = case elemIndex l xargs of
-                    Just n -> (n, makeTypeIndex t) : makeTypeIndexList ts
+                    Just n -> (n, Base (fromJust $ elemIndex (Atom t) xargs)) : makeTypeIndexList ts
+                  makeTypeIndexList (l@(List _ t) : ts) =
+                    (fromJust $ elemIndex l xargs, makeTypeIndex t) : makeTypeIndexList ts
 
 apply :: FutureVal -> [FutureVal] -> IOResult FutureVal
 apply (Primitive func) args = liftResult $ func args
@@ -185,9 +187,9 @@ apply (Type t) [] = return $ Type t
 apply (Type t) [arg] = constructVal t arg
 apply (Type t) args = throwError $ NumArgs 1 args
 apply (TypeConst inputTypes out enum indices) args = do
-  constChecked <- checkTypeList inputTypes args
-  typeChecked <- checkTypeList (indexTypes indices $ typesList out) constChecked
-  return $ Custom out enum (zip typeChecked indices)
+  checkTypeList inputTypes args
+  checkTypeList (indexTypes inputTypes indices $ typesList out) args
+  return $ Custom out enum (zip args indices)
     where typesList (CustomT _ ts) = ts
           typesList (PartialT _ (CustomT _ ts)) = ts
 apply (Function params varargs body env) args =
@@ -241,7 +243,7 @@ constructVal (PartialT _ t) v = constructVal t v
 -- TODO: Implement recursive type checking
 constructVal t@(CustomT n1 ts) v@(Custom vt variant vs) = if checkType v t
   then do
-    _ <- checkTypeList (indexTypes [i | (_,i) <- vs] ts) [v | (v,_) <- vs]
+    checkTypeIndices [v | (v,_) <- vs] [i | (_,i) <- vs] ts
     return $ Custom t variant vs
   else throwError $ TypeError t vt
 -- TODO: Evaluate return type via function body
