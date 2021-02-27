@@ -1,4 +1,5 @@
 (load "test-driver.scm")
+(load "tests/1-1.scm")
 
 (define (emit-program expr)
   (define (emit-prim x)
