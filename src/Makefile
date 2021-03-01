@@ -18,6 +18,8 @@
 emitted: runtime.c emitted.ll
 	clang \
 		-Wall \
+		-Wno-implicit-function-declaration \
+		-Wno-override-module \
 		-O3 runtime.c emitted.ll \
 		-o emitted
 
